@@ -1,6 +1,7 @@
 mod ast;
+mod case_folder;
 mod char_class;
-mod compiler;
+mod code_generator;
 mod cursor;
 mod dfa;
 mod nfa;
@@ -10,13 +11,15 @@ mod range;
 mod regex;
 mod sparse_set;
 mod str_cursor;
-mod utf8;
+mod unicode_tables;
+mod utf8_encoder;
 
 pub use self::regex::Regex;
 
 use self::{
-    ast::Ast, char_class::CharClass, compiler::Compiler, cursor::Cursor, dfa::Dfa, nfa::Nfa,
-    parser::Parser, program::Program, range::Range, sparse_set::SparseSet, str_cursor::StrCursor,
+    ast::Ast, case_folder::CaseFolder, char_class::CharClass, code_generator::CodeGenerator,
+    cursor::Cursor, dfa::Dfa, nfa::Nfa, parser::Parser, program::Program, range::Range,
+    sparse_set::SparseSet, str_cursor::StrCursor, utf8_encoder::Utf8Encoder,
 };
 
 #[cfg(test)]
@@ -25,8 +28,8 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new("a*(bbb)c*");
-        let mut slots = [None; 4];
+        let regex = Regex::new("[^abc][^abc][^abc]");
+        let mut slots = [None; 2];
         println!("{:?}", regex.run("xxxaaabbbcccyyy", &mut slots));
         println!("{:?}", slots);
     }

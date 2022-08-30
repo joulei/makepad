@@ -60,9 +60,9 @@ impl Dfa {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Options {
-    pub stop_after_first_match: bool,
-    pub continue_until_last_match: bool,
+pub(crate) struct Options {
+    pub(crate) stop_after_first_match: bool,
+    pub(crate) continue_until_last_match: bool,
 }
 
 struct RunContext<'a, C> {

@@ -11,9 +11,9 @@ impl CharClass {
     }
 
     pub(crate) fn any() -> Self {
-        Self {
-            range_set: (0..char::MAX as u32 + 1).into(),
-        }
+        let mut char_class = Self::new();
+        char_class.insert(Range::new('\0', char::MAX));
+        char_class
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -32,6 +32,10 @@ impl CharClass {
         Iter {
             iter: self.range_set.iter(),
         }
+    }
+
+    pub(crate) fn negate(&self, output: &mut Self) {
+        Self::any().difference(self, output)
     }
 
     pub(crate) fn difference(&self, other: &Self, output: &mut Self) {
@@ -58,9 +62,14 @@ impl CharClass {
             .extend(self.range_set.union(&other.range_set));
     }
 
-    pub(crate) fn insert(&mut self, range: Range<char>) {
-        self.range_set
-            .insert(range.start as u32..range.end as u32 + 1);
+    pub(crate) fn insert(&mut self, char_range: Range<char>) {
+        let range = Range::new(char_range.start as u32, char_range.end as u32);
+        if range.start <= 0xD7FF && range.end >= 0xE000 {
+            self.range_set.insert(range.start..0xD800);
+            self.range_set.insert(0xE000..range.end + 1);
+        } else {
+            self.range_set.insert(range.start..range.end + 1);
+        }
     }
 
     pub(crate) fn clear(&mut self) {

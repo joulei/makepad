@@ -5,36 +5,34 @@ use {
 
 const MAX_LEN: usize = 4;
 
-#[derive(Clone, Debug)]
-pub(crate) struct Encoder {
-    range_stack: Vec<Range<u32>>,
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Utf8Encoder {
+    stack: Vec<Range<u32>>,
 }
 
-impl Encoder {
+impl Utf8Encoder {
     pub(crate) fn new() -> Self {
-        Self {
-            range_stack: Vec::new(),
-        }
+        Self::default()
     }
 
-    pub(crate) fn encode(&mut self, char_range: Range<char>) -> Encode<'_> {
-        self.range_stack
+    pub(crate) fn encode(&mut self, char_range: Range<char>) -> EncodeCharRange<'_> {
+        self.stack
             .push(Range::new(char_range.start as u32, char_range.end as u32));
-        Encode {
-            range_stack: &mut self.range_stack,
+        EncodeCharRange {
+            stack: &mut self.stack,
         }
     }
 }
 
-pub(crate) struct Encode<'a> {
-    range_stack: &'a mut Vec<Range<u32>>,
+pub(crate) struct EncodeCharRange<'a> {
+    stack: &'a mut Vec<Range<u32>>,
 }
 
-impl<'a> Iterator for Encode<'a> {
+impl<'a> Iterator for EncodeCharRange<'a> {
     type Item = ByteRanges;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(mut range) = self.range_stack.pop() {
+        while let Some(mut range) = self.stack.pop() {
             'LOOP: loop {
                 if range.end <= 0x7F {
                     return Some(ByteRanges::One([Range::new(
@@ -43,14 +41,14 @@ impl<'a> Iterator for Encode<'a> {
                     )]));
                 }
                 if range.start < 0xE000 && range.end > 0xD7FF {
-                    self.range_stack.push(Range::new(0xE000, range.end));
+                    self.stack.push(Range::new(0xE000, range.end));
                     range.end = 0xD7FF;
                     continue 'LOOP;
                 }
                 for index in 1..MAX_LEN {
                     let max = max_scalar(index);
                     if range.start <= max && max < range.end {
-                        self.range_stack.push(Range::new(max + 1, range.end));
+                        self.stack.push(Range::new(max + 1, range.end));
                         range.end = max;
                         continue 'LOOP;
                     }
@@ -59,14 +57,13 @@ impl<'a> Iterator for Encode<'a> {
                     let mask = (1 << (6 * index)) - 1;
                     if range.start & !mask != range.end & !mask {
                         if range.start & mask != 0 {
-                            self.range_stack
+                            self.stack
                                 .push(Range::new((range.start | mask) + 1, range.end));
                             range.end = range.start | mask;
                             continue 'LOOP;
                         }
                         if range.end & mask != mask {
-                            self.range_stack
-                                .push(Range::new(range.end & !mask, range.end));
+                            self.stack.push(Range::new(range.end & !mask, range.end));
                             range.end = (range.end & !mask) - 1;
                             continue 'LOOP;
                         }
@@ -106,9 +103,9 @@ impl<'a> Iterator for Encode<'a> {
     }
 }
 
-impl<'a> Drop for Encode<'a> {
+impl<'a> Drop for EncodeCharRange<'a> {
     fn drop(&mut self) {
-        self.range_stack.clear();
+        self.stack.clear();
     }
 }
 
@@ -169,7 +166,7 @@ mod tests {
 
     #[test]
     fn encode() {
-        let mut encoder = Encoder::new();
+        let mut encoder = Utf8Encoder::new();
         assert_eq!(
             encoder
                 .encode(Range::new('\u{0}', '\u{10FFFF}'))

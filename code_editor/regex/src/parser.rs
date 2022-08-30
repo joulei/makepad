@@ -1,35 +1,37 @@
 use {
     crate::{
         ast::{Pred, Quant},
-        Ast, CharClass, Range,
+        Ast, CaseFolder, CharClass, Range,
     },
     std::str::Chars,
 };
 
-#[derive(Clone, Debug)]
-pub struct Parser {
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Parser {
     asts: Vec<Ast>,
     groups: Vec<Group>,
+    case_folder: CaseFolder,
+    char_class: CharClass,
 }
 
 impl Parser {
     pub(crate) fn new() -> Self {
-        Self {
-            asts: Vec::new(),
-            groups: Vec::new(),
-        }
+        Self::default()
     }
 
-    pub(crate) fn parse(&mut self, pattern: &str) -> Ast {
+    pub(crate) fn parse(&mut self, pattern: &str, options: Options) -> Ast {
         let mut chars = pattern.chars();
         ParseContext {
-            cap_count: 1,
+            asts: &mut self.asts,
+            groups: &mut self.groups,
+            folder: &mut self.case_folder,
+            char_class: &mut self.char_class,
             ch_0: chars.next(),
             ch_1: chars.next(),
             chars,
             position: 0,
-            asts: &mut self.asts,
-            groups: &mut self.groups,
+            options,
+            cap_count: 1,
             group: Group::new(Some(0)),
         }
         .parse()
@@ -38,13 +40,16 @@ impl Parser {
 
 #[derive(Debug)]
 struct ParseContext<'a> {
-    cap_count: usize,
+    folder: &'a mut CaseFolder,
+    char_class: &'a mut CharClass,
+    asts: &'a mut Vec<Ast>,
+    groups: &'a mut Vec<Group>,
     ch_0: Option<char>,
     ch_1: Option<char>,
     chars: Chars<'a>,
     position: usize,
-    asts: &'a mut Vec<Ast>,
-    groups: &'a mut Vec<Group>,
+    options: Options,
+    cap_count: usize,
     group: Group,
 }
 
@@ -60,33 +65,36 @@ impl<'a> ParseContext<'a> {
                 }
                 Some('?') => {
                     self.skip_char();
-                    let mut lazy = false;
+                    let mut is_lazy = false;
                     if self.peek_char() == Some('?') {
                         self.skip_char();
-                        lazy = true;
+                        is_lazy = true;
                     }
                     let ast = self.asts.pop().unwrap();
-                    self.asts.push(Ast::Rep(Box::new(ast), Quant::Quest(lazy)));
+                    self.asts
+                        .push(Ast::Rep(Box::new(ast), Quant::Quest(is_lazy)));
                 }
                 Some('*') => {
                     self.skip_char();
-                    let mut lazy = false;
+                    let mut is_lazy = false;
                     if self.peek_char() == Some('?') {
                         self.skip_char();
-                        lazy = true;
+                        is_lazy = true;
                     }
                     let ast = self.asts.pop().unwrap();
-                    self.asts.push(Ast::Rep(Box::new(ast), Quant::Star(lazy)));
+                    self.asts
+                        .push(Ast::Rep(Box::new(ast), Quant::Star(is_lazy)));
                 }
                 Some('+') => {
                     self.skip_char();
-                    let mut lazy = false;
+                    let mut is_lazy = false;
                     if self.peek_char() == Some('?') {
                         self.skip_char();
-                        lazy = true;
+                        is_lazy = true;
                     }
                     let ast = self.asts.pop().unwrap();
-                    self.asts.push(Ast::Rep(Box::new(ast), Quant::Plus(lazy)));
+                    self.asts
+                        .push(Ast::Rep(Box::new(ast), Quant::Plus(is_lazy)));
                 }
                 Some('^') => {
                     self.skip_char();
@@ -142,8 +150,15 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_char_class(&mut self) -> CharClass {
+        use std::mem;
+
         let mut char_class = CharClass::new();
         self.skip_char();
+        let mut is_negated = false;
+        if self.peek_char() == Some('^') {
+            self.skip_char();
+            is_negated = true;
+        }
         let mut is_first = true;
         loop {
             match self.peek_char() {
@@ -151,9 +166,21 @@ impl<'a> ParseContext<'a> {
                     self.skip_char();
                     break;
                 }
-                _ => char_class.insert(self.parse_char_range()),
+                _ => {
+                    let char_range = self.parse_char_range();
+                    if self.options.ignore_case {
+                        self.folder.fold(char_range, &mut char_class);
+                    } else {
+                        char_class.insert(char_range);
+                    }
+                }
             }
             is_first = false;
+        }
+        if is_negated {
+            char_class.negate(&mut self.char_class);
+            mem::swap(&mut char_class, &mut self.char_class);
+            self.char_class.clear();
         }
         char_class
     }
@@ -254,6 +281,11 @@ impl<'a> ParseContext<'a> {
         self.group.ast_count -= self.group.cat_count;
         self.group.cat_count = 0;
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Options {
+    pub(crate) ignore_case: bool,
 }
 
 #[derive(Clone, Copy, Debug)]

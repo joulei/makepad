@@ -1,5 +1,7 @@
 use {
-    crate::{compiler, dfa, Compiler, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
+    crate::{
+        code_generator, dfa, parser, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor,
+    },
     std::{cell::RefCell, sync::Arc},
 };
 
@@ -12,29 +14,25 @@ pub struct Regex {
 impl Regex {
     pub fn new(pattern: &str) -> Self {
         let mut parser = Parser::new();
-        let ast = parser.parse(pattern);
-        let mut compiler = Compiler::new();
-        let dfa_program = compiler.compile(
+        let ast = parser.parse(pattern, parser::Options::default());
+        let mut code_generator = CodeGenerator::new();
+        let dfa_program = code_generator.generate(
             &ast,
-            compiler::Options {
-                dot_star: true,
+            code_generator::Options {
                 bytes: true,
-                ..compiler::Options::default()
+                dot_star: true,
+                ..code_generator::Options::default()
             },
         );
-        let reverse_dfa_program = compiler.compile(
+        let reverse_dfa_program = code_generator.generate(
             &ast,
-            compiler::Options {
-                dot_star: true,
+            code_generator::Options {
                 bytes: true,
                 reverse: true,
-                ..compiler::Options::default()
+                ..code_generator::Options::default()
             },
         );
-        let nfa_program = compiler.compile(
-            &ast,
-            compiler::Options::default()
-        );
+        let nfa_program = code_generator.generate(&ast, code_generator::Options::default());
         Self {
             unique: Box::new(RefCell::new(Unique {
                 dfa: Dfa::new(),
@@ -61,20 +59,23 @@ impl Regex {
             dfa::Options {
                 stop_after_first_match: slots.is_empty(),
                 ..dfa::Options::default()
-            }
+            },
         ) {
             Some(end) => end,
             None => return false,
         };
         cursor.move_to(end);
-        let start = unique.reverse_dfa.run(
-            &self.shared.reverse_dfa_program,
-            (&mut cursor).rev(),
-            dfa::Options {
-                continue_until_last_match: true,
-                ..dfa::Options::default()
-            },
-        ).unwrap();
+        let start = unique
+            .reverse_dfa
+            .run(
+                &self.shared.reverse_dfa_program,
+                (&mut cursor).rev(),
+                dfa::Options {
+                    continue_until_last_match: true,
+                    ..dfa::Options::default()
+                },
+            )
+            .unwrap();
         cursor.move_to(start);
         if slots.len() == 2 {
             slots[0] = Some(start);
