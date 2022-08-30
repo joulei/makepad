@@ -141,18 +141,20 @@ impl<T> RangeSet<T> {
     }
 
     /// Adds the given `range` to `self`.
+    /// 
+    /// Returns `true` if the `range` was newly inserted.
     ///
     /// # Performance
     ///
     /// Runs in O(log n) time.
-    pub fn insert(&mut self, mut range: Range<T>)
+    pub fn insert(&mut self, mut range: Range<T>) -> bool
     where
         T: Clone + Ord,
     {
         use std::{cmp::Ordering, iter};
 
         if range.is_empty() {
-            return;
+            return false;
         }
         let start = match self.ranges.binary_search_by(|mid| {
             if mid.end < range.start {
@@ -184,7 +186,11 @@ impl<T> RangeSet<T> {
             }
             Err(index) => index,
         };
+        if start == end + 1 && self.ranges[start] == range {
+            return false;
+        }
         self.ranges.splice(start..end, iter::once(range));
+        true
     }
 
     /// Clears the set, removing all [`Range`]s.

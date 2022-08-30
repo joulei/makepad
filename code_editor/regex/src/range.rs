@@ -5,7 +5,7 @@ pub(crate) struct Range<T> {
 }
 
 impl<T> Range<T> {
-    pub(crate) fn new(start: T, end: T) -> Self {
+    pub(crate) const fn new(start: T, end: T) -> Self {
         Self { start, end }
     }
 

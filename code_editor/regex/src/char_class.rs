@@ -62,13 +62,15 @@ impl CharClass {
             .extend(self.range_set.union(&other.range_set));
     }
 
-    pub(crate) fn insert(&mut self, char_range: Range<char>) {
+    pub(crate) fn insert(&mut self, char_range: Range<char>) -> bool {
         let range = Range::new(char_range.start as u32, char_range.end as u32);
         if range.start <= 0xD7FF && range.end >= 0xE000 {
-            self.range_set.insert(range.start..0xD800);
-            self.range_set.insert(0xE000..range.end + 1);
+            let mut is_new = false;
+            is_new |= self.range_set.insert(range.start..0xD800);
+            is_new |= self.range_set.insert(0xE000..range.end + 1);
+            is_new
         } else {
-            self.range_set.insert(range.start..range.end + 1);
+            self.range_set.insert(range.start..range.end + 1)
         }
     }
 

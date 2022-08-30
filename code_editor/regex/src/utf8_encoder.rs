@@ -15,20 +15,20 @@ impl Utf8Encoder {
         Self::default()
     }
 
-    pub(crate) fn encode(&mut self, char_range: Range<char>) -> EncodeCharRange<'_> {
+    pub(crate) fn encode(&mut self, char_range: Range<char>) -> Encode<'_> {
         self.stack
             .push(Range::new(char_range.start as u32, char_range.end as u32));
-        EncodeCharRange {
+        Encode {
             stack: &mut self.stack,
         }
     }
 }
 
-pub(crate) struct EncodeCharRange<'a> {
+pub(crate) struct Encode<'a> {
     stack: &'a mut Vec<Range<u32>>,
 }
 
-impl<'a> Iterator for EncodeCharRange<'a> {
+impl<'a> Iterator for Encode<'a> {
     type Item = ByteRanges;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -103,7 +103,7 @@ impl<'a> Iterator for EncodeCharRange<'a> {
     }
 }
 
-impl<'a> Drop for EncodeCharRange<'a> {
+impl<'a> Drop for Encode<'a> {
     fn drop(&mut self) {
         self.stack.clear();
     }

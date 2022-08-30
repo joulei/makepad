@@ -1,7 +1,9 @@
-use crate::{CharClass, Range};
+use crate::{unicode_tables, CharClass, Range};
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CaseFolder {}
+pub(crate) struct CaseFolder {
+    stack: Vec<Range<char>>,
+}
 
 impl CaseFolder {
     pub(crate) fn new() -> Self {
