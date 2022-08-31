@@ -1,7 +1,5 @@
 use {
-    crate::{
-        code_generator, dfa, parser, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor,
-    },
+    crate::{code_generator, dfa, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
     std::{cell::RefCell, sync::Arc},
 };
 
@@ -12,15 +10,9 @@ pub struct Regex {
 }
 
 impl Regex {
-    pub fn new(pattern: &str, options: Options) -> Self {
+    pub fn new(pattern: &str) -> Self {
         let mut parser = Parser::new();
-        let ast = parser.parse(
-            pattern,
-            parser::Options {
-                ignore_case: options.ignore_case,
-                ..parser::Options::default()
-            },
-        );
+        let ast = parser.parse(pattern);
         let mut code_generator = CodeGenerator::new();
         let dfa_program = code_generator.generate(
             &ast,
@@ -91,11 +83,6 @@ impl Regex {
         }
         true
     }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Options {
-    pub ignore_case: bool,
 }
 
 #[derive(Clone, Debug)]

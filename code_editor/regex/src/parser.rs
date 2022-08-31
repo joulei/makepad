@@ -3,7 +3,7 @@ use {
         ast::{Pred, Quant},
         Ast, CaseFolder, CharClass, Range,
     },
-    std::{error, fmt, str::Chars},
+    std::str::Chars,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -19,20 +19,20 @@ impl Parser {
         Self::default()
     }
 
-    pub(crate) fn parse(&mut self, pattern: &str, options: Options) -> Ast {
+    pub(crate) fn parse(&mut self, pattern: &str) -> Ast {
         let mut chars = pattern.chars();
         ParseContext {
             asts: &mut self.asts,
             groups: &mut self.groups,
             case_folder: &mut self.case_folder,
             char_class: &mut self.char_class,
+            pattern,
             ch_0: chars.next(),
             ch_1: chars.next(),
             chars,
             byte_position: 0,
-            options,
             cap_count: 1,
-            group: Group::new(Some(0)),
+            group: Group::new(Some(0), Flags::default()),
         }
         .parse()
     }
@@ -44,11 +44,11 @@ struct ParseContext<'a> {
     groups: &'a mut Vec<Group>,
     case_folder: &'a mut CaseFolder,
     char_class: &'a mut CharClass,
+    pattern: &'a str,
     ch_0: Option<char>,
     ch_1: Option<char>,
     chars: Chars<'a>,
     byte_position: usize,
-    options: Options,
     cap_count: usize,
     group: Group,
 }
@@ -65,36 +65,36 @@ impl<'a> ParseContext<'a> {
                 }
                 Some('?') => {
                     self.skip_char();
-                    let mut is_lazy = false;
+                    let mut non_greedy = false;
                     if self.peek_char() == Some('?') {
                         self.skip_char();
-                        is_lazy = true;
+                        non_greedy = true;
                     }
                     let ast = self.asts.pop().unwrap();
                     self.asts
-                        .push(Ast::Rep(Box::new(ast), Quant::Quest(is_lazy)));
+                        .push(Ast::Rep(Box::new(ast), Quant::Quest(non_greedy)));
                 }
                 Some('*') => {
                     self.skip_char();
-                    let mut is_lazy = false;
+                    let mut non_greedy = false;
                     if self.peek_char() == Some('?') {
                         self.skip_char();
-                        is_lazy = true;
+                        non_greedy = true;
                     }
                     let ast = self.asts.pop().unwrap();
                     self.asts
-                        .push(Ast::Rep(Box::new(ast), Quant::Star(is_lazy)));
+                        .push(Ast::Rep(Box::new(ast), Quant::Star(non_greedy)));
                 }
                 Some('+') => {
                     self.skip_char();
-                    let mut is_lazy = false;
+                    let mut non_greedy = false;
                     if self.peek_char() == Some('?') {
                         self.skip_char();
-                        is_lazy = true;
+                        non_greedy = true;
                     }
                     let ast = self.asts.pop().unwrap();
                     self.asts
-                        .push(Ast::Rep(Box::new(ast), Quant::Plus(is_lazy)));
+                        .push(Ast::Rep(Box::new(ast), Quant::Plus(non_greedy)));
                 }
                 Some('^') => {
                     self.skip_char();
@@ -110,14 +110,24 @@ impl<'a> ParseContext<'a> {
                 }
                 Some('(') => {
                     self.skip_char();
-                    let cap = match self.peek_two_chars() {
-                        (Some('?'), Some(':')) => {
-                            self.skip_two_chars();
-                            false
+                    match self.peek_char() {
+                        Some('?') => {
+                            self.skip_char();
+                            let flags = self.parse_flags();
+                            match self.peek_char() {
+                                Some(':') => {
+                                    self.skip_char();
+                                    self.push_group(true, flags);
+                                }
+                                Some(')') => {
+                                    self.skip_char();
+                                    self.group.flags = flags;
+                                }
+                                _ => panic!(),
+                            }
                         }
-                        _ => true,
+                        _ => self.push_group(false, Flags::default()),
                     };
-                    self.push_group(cap);
                 }
                 Some(')') => {
                     self.skip_char();
@@ -138,7 +148,7 @@ impl<'a> ParseContext<'a> {
                 Some(ch) => {
                     self.skip_char();
                     self.maybe_push_cat();
-                    self.asts.push(if self.options.ignore_case {
+                    self.asts.push(if self.group.flags.case_insensitive {
                         let mut char_class = CharClass::new();
                         self.case_folder.fold(Range::new(ch, ch), &mut char_class);
                         Ast::CharClass(char_class)
@@ -155,35 +165,105 @@ impl<'a> ParseContext<'a> {
         self.asts.pop().unwrap()
     }
 
+    fn parse_flags(&mut self) -> Flags {
+        let mut flags = Flags::default();
+        loop {
+            match self.peek_char() {
+                Some(':') | Some(')') => break,
+                Some('i') => {
+                    self.skip_char();
+                    flags.case_insensitive = true;
+                }
+                _ => panic!(),
+            }
+        }
+        flags
+    }
+
     fn parse_char_class(&mut self) -> CharClass {
         use std::mem;
 
         let mut char_class = CharClass::new();
         self.skip_char();
-        let mut is_negated = false;
+        let mut negated = false;
         if self.peek_char() == Some('^') {
             self.skip_char();
-            is_negated = true;
+            negated = true;
         }
-        let mut is_first = true;
+        let mut first = true;
         loop {
-            match self.peek_char() {
-                Some(']') if !is_first => {
+            match self.peek_two_chars() {
+                (Some('['), Some(':')) => {
+                    char_class.union(&self.parse_named_char_class(), &mut self.char_class);
+                    mem::swap(&mut char_class, &mut self.char_class);
+                    self.char_class.clear();
+                }
+                (Some(']'), _) if !first => {
                     self.skip_char();
                     break;
                 }
                 _ => {
                     let char_range = self.parse_char_range();
-                    if self.options.ignore_case {
+                    if self.group.flags.case_insensitive {
                         self.case_folder.fold(char_range, &mut char_class);
                     } else {
                         char_class.insert(char_range);
                     }
                 }
             }
-            is_first = false;
+            first = false;
         }
-        if is_negated {
+        if negated {
+            char_class.negate(&mut self.char_class);
+            mem::swap(&mut char_class, &mut self.char_class);
+            self.char_class.clear();
+        }
+        char_class
+    }
+
+    fn parse_named_char_class(&mut self) -> CharClass {
+        use {crate::unicode_tables::compatibility_properties, std::mem};
+
+        self.skip_two_chars();
+        let mut negated = false;
+        if self.peek_char() == Some('^') {
+            self.skip_char();
+            negated = true;
+        }
+        let start = self.byte_position;
+        let end;
+        loop {
+            match self.peek_two_chars() {
+                (Some(':'), Some(']')) => {
+                    end = self.byte_position;
+                    self.skip_two_chars();
+                    break;
+                }
+                (Some(_), _) => self.skip_char(),
+                (None, _) => panic!(),
+            }
+        }
+        let mut char_class = CharClass::from_sorted_iter(
+            match &self.pattern[start..end] {
+                "alnum" => compatibility_properties::ALNUM.as_slice(),
+                "alpha" => compatibility_properties::ALPHA.as_slice(),
+                "blank" => compatibility_properties::BLANK.as_slice(),
+                "cntrl" => compatibility_properties::CNTRL.as_slice(),
+                "digit" => compatibility_properties::DIGIT.as_slice(),
+                "graph" => compatibility_properties::GRAPH.as_slice(),
+                "lower" => compatibility_properties::LOWER.as_slice(),
+                "print" => compatibility_properties::PRINT.as_slice(),
+                "punct" => compatibility_properties::PUNCT.as_slice(),
+                "space" => compatibility_properties::SPACE.as_slice(),
+                "upper" => compatibility_properties::UPPER.as_slice(),
+                "word" => compatibility_properties::WORD.as_slice(),
+                "xdigit" => compatibility_properties::XDIGIT.as_slice(),
+                _ => panic!(),
+            }
+            .iter()
+            .cloned(),
+        );
+        if negated {
             char_class.negate(&mut self.char_class);
             mem::swap(&mut char_class, &mut self.char_class);
             self.char_class.clear();
@@ -230,7 +310,7 @@ impl<'a> ParseContext<'a> {
         self.ch_1 = self.chars.next();
     }
 
-    fn push_group(&mut self, cap: bool) {
+    fn push_group(&mut self, cap: bool, flags: Flags) {
         use std::mem;
 
         self.maybe_push_cat();
@@ -242,16 +322,16 @@ impl<'a> ParseContext<'a> {
         } else {
             None
         };
-        let group = mem::replace(&mut self.group, Group::new(cap_index));
+        let group = mem::replace(&mut self.group, Group::new(cap_index, flags));
         self.groups.push(group);
     }
 
     fn pop_group(&mut self) {
         self.maybe_push_cat();
         self.pop_alts();
-        if let Some(index) = self.group.cap {
+        if let Some(cap_index) = self.group.cap_index {
             let ast = self.asts.pop().unwrap();
-            self.asts.push(Ast::Cap(Box::new(ast), index));
+            self.asts.push(Ast::Capture(Box::new(ast), cap_index));
         }
         self.group = self.groups.pop().unwrap();
         self.group.ast_count += 1;
@@ -289,26 +369,28 @@ impl<'a> ParseContext<'a> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct Options {
-    pub(crate) ignore_case: bool,
-}
-
 #[derive(Clone, Copy, Debug)]
 struct Group {
-    cap: Option<usize>,
+    cap_index: Option<usize>,
+    flags: Flags,
     ast_count: usize,
     alt_count: usize,
     cat_count: usize,
 }
 
 impl Group {
-    fn new(index: Option<usize>) -> Self {
+    fn new(cap_index: Option<usize>, flags: Flags) -> Self {
         Self {
-            cap: index,
+            cap_index,
+            flags,
             ast_count: 0,
             alt_count: 0,
             cat_count: 0,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct Flags {
+    case_insensitive: bool,
 }

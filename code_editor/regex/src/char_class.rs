@@ -16,12 +16,21 @@ impl CharClass {
         char_class
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.range_set.is_empty()
+    pub(crate) fn from_sorted_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = Range<char>>,
+    {
+        Self {
+            range_set: RangeSet::from_sorted_vec(
+                iter.into_iter()
+                    .map(|range| range.start as u32..range.end as u32 + 1)
+                    .collect(),
+            ),
+        }
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.range_set.len()
+    pub(crate) fn is_empty(&self) -> bool {
+        self.range_set.is_empty()
     }
 
     pub(crate) fn contains(&self, ch: char) -> bool {
@@ -35,31 +44,19 @@ impl CharClass {
     }
 
     pub(crate) fn negate(&self, output: &mut Self) {
-        Self::any().difference(self, output)
-    }
-
-    pub(crate) fn difference(&self, other: &Self, output: &mut Self) {
-        output
-            .range_set
-            .extend(self.range_set.difference(&other.range_set));
-    }
-
-    pub(crate) fn intersection(&self, other: &Self, output: &mut Self) {
-        output
-            .range_set
-            .extend(self.range_set.intersection(&other.range_set));
-    }
-
-    pub(crate) fn symmetric_difference(&self, other: &Self, output: &mut Self) {
-        output
-            .range_set
-            .extend(self.range_set.symmetric_difference(&other.range_set));
+        Self::any().difference(self, output);
     }
 
     pub(crate) fn union(&self, other: &Self, output: &mut Self) {
         output
             .range_set
             .extend(self.range_set.union(&other.range_set));
+    }
+
+    pub(crate) fn difference(&self, other: &Self, output: &mut Self) {
+        output
+            .range_set
+            .extend(self.range_set.difference(&other.range_set));
     }
 
     pub(crate) fn insert(&mut self, char_range: Range<char>) -> bool {

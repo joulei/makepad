@@ -37,8 +37,8 @@ impl CodeGenerator {
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Options {
     pub(crate) reverse: bool,
-    pub(crate) bytes: bool,
     pub(crate) dot_star: bool,
+    pub(crate) bytes: bool,
 }
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ struct CompileContext<'a> {
 impl<'a> CompileContext<'a> {
     fn generate(mut self, ast: &Ast) -> Program {
         let mut frag = self.generate_recursive(ast);
-        frag = self.generate_cap(frag, 0);
+        frag = self.generate_capture(frag, 0);
         self.options.reverse = false;
         let match_frag = self.generate_match();
         frag = self.generate_cat(frag, match_frag);
@@ -74,22 +74,22 @@ impl<'a> CompileContext<'a> {
         match *ast {
             Ast::Char(ch) => self.generate_char(ch),
             Ast::CharClass(ref char_class) => self.generate_char_class(char_class),
-            Ast::Cap(ref ast, index) => {
+            Ast::Capture(ref ast, index) => {
                 let frag = self.generate_recursive(ast);
-                self.generate_cap(frag, index)
+                self.generate_capture(frag, index)
             }
             Ast::Assert(pred) => self.generate_assert(pred),
-            Ast::Rep(ref ast, Quant::Quest(is_lazy)) => {
+            Ast::Rep(ref ast, Quant::Quest(non_greedy)) => {
                 let frag = self.generate_recursive(ast);
-                self.generate_quest(frag, is_lazy)
+                self.generate_quest(frag, non_greedy)
             }
-            Ast::Rep(ref ast, Quant::Star(is_lazy)) => {
+            Ast::Rep(ref ast, Quant::Star(non_greedy)) => {
                 let frag = self.generate_recursive(ast);
-                self.generate_star(frag, is_lazy)
+                self.generate_star(frag, non_greedy)
             }
-            Ast::Rep(ref ast, Quant::Plus(is_lazy)) => {
+            Ast::Rep(ref ast, Quant::Plus(non_greedy)) => {
                 let frag = self.generate_recursive(ast);
-                self.generate_plus(frag, is_lazy)
+                self.generate_plus(frag, non_greedy)
             }
             Ast::Cat(ref asts) => {
                 let mut asts = asts.iter();
@@ -185,8 +185,8 @@ impl<'a> CompileContext<'a> {
         }
     }
 
-    fn generate_cap(&mut self, frag: Frag, cap_index: usize) -> Frag {
-        let first_slot_index = cap_index * 2;
+    fn generate_capture(&mut self, frag: Frag, capture_index: usize) -> Frag {
+        let first_slot_index = capture_index * 2;
         self.slot_count = self.slot_count.max(first_slot_index + 2);
         let instr_0 = self.emit_instr(Instr::Save(first_slot_index, frag.start));
         let instr_1 = self.emit_instr(Instr::Save(first_slot_index + 1, program::NULL_INSTR_PTR));
@@ -218,10 +218,10 @@ impl<'a> CompileContext<'a> {
         }
     }
 
-    fn generate_quest(&mut self, frag: Frag, is_lazy: bool) -> Frag {
+    fn generate_quest(&mut self, frag: Frag, non_greedy: bool) -> Frag {
         let instr;
         let hole;
-        if is_lazy {
+        if non_greedy {
             instr = self.emit_instr(Instr::Split(program::NULL_INSTR_PTR, frag.start));
             hole = HolePtr::next_0(instr);
         } else {
@@ -234,10 +234,10 @@ impl<'a> CompileContext<'a> {
         }
     }
 
-    fn generate_star(&mut self, frag: Frag, is_lazy: bool) -> Frag {
+    fn generate_star(&mut self, frag: Frag, non_greedy: bool) -> Frag {
         let instr;
         let hole;
-        if is_lazy {
+        if non_greedy {
             instr = self.emit_instr(Instr::Split(program::NULL_INSTR_PTR, frag.start));
             hole = HolePtr::next_0(instr);
         } else {
@@ -251,10 +251,10 @@ impl<'a> CompileContext<'a> {
         }
     }
 
-    fn generate_plus(&mut self, frag: Frag, is_lazy: bool) -> Frag {
+    fn generate_plus(&mut self, frag: Frag, non_greedy: bool) -> Frag {
         let instr;
         let hole;
-        if is_lazy {
+        if non_greedy {
             instr = self.emit_instr(Instr::Split(program::NULL_INSTR_PTR, frag.start));
             hole = HolePtr::next_0(instr);
         } else {

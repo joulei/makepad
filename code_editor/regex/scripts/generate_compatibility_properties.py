@@ -32,7 +32,7 @@ def main():
     
     alpha = set()
     alpha.update(derived_properties["Alphabetic"])
-    alpha = sorted(alnum)
+    alpha = sorted(alpha)
 
     blank = set()
     blank.update(general_category["Zs"])
@@ -109,6 +109,7 @@ def main():
         ("CNTRL", cntrl),
         ("DIGIT", digit),
         ("GRAPH", graph),
+        ("LOWER", lower),
         ("PRINT", print_),
         ("PUNCT", punct),
         ("SPACE", space),

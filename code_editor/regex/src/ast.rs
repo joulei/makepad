@@ -4,7 +4,7 @@ use crate::CharClass;
 pub(crate) enum Ast {
     Char(char),
     CharClass(CharClass),
-    Cap(Box<Ast>, usize),
+    Capture(Box<Ast>, usize),
     Assert(Pred),
     Rep(Box<Ast>, Quant),
     Cat(Vec<Ast>),

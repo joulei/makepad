@@ -11,10 +11,6 @@ pub(crate) struct Utf8Encoder {
 }
 
 impl Utf8Encoder {
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
     pub(crate) fn encode(&mut self, char_range: Range<char>) -> Encode<'_> {
         self.stack
             .push(Range::new(char_range.start as u32, char_range.end as u32));
@@ -161,12 +157,13 @@ fn max_scalar(len: usize) -> u32 {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn encode() {
-        let mut encoder = Utf8Encoder::new();
+        let mut encoder = Utf8Encoder::default();
         assert_eq!(
             encoder
                 .encode(Range::new('\u{0}', '\u{10FFFF}'))

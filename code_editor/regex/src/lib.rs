@@ -29,15 +29,9 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new(
-            "[abc]b[abc]",
-            regex::Options {
-                ignore_case: true,
-                ..regex::Options::default()
-            },
-        );
+        let regex = Regex::new("[[:^alpha:]]+");
         let mut slots = [None; 2];
-        println!("{:?}", regex.run("xxxaAaBcCcyyy", &mut slots));
+        println!("{:?}", regex.run("xxxa123AaBcCcyyy", &mut slots));
         println!("{:?}", slots);
     }
 }

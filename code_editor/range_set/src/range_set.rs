@@ -19,6 +19,25 @@ impl<T> RangeSet<T> {
         Self { ranges: Vec::new() }
     }
 
+    /// Creates a [`RangeSet`] from a sorted vector of [`Range`]s.
+    /// 
+    /// # Performance
+    /// 
+    /// Runs in O(n) time.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the vector is not sorted.
+    pub fn from_sorted_vec(ranges: Vec<Range<T>>) -> Self
+    where
+        T: Ord
+    {
+        assert!(ranges.windows(2).all(|chunk| chunk[0].end < chunk[1].start));
+        Self {
+            ranges
+        }
+    }
+
     /// Constructs a new, empty `RangeSet` with at least the given `capacity`.
     ///
     /// # Performance
@@ -193,13 +212,22 @@ impl<T> RangeSet<T> {
         true
     }
 
-    /// Clears the set, removing all [`Range`]s.
+    /// Clears `self`, removing all [`Range`]s.
     ///
     /// # Performance
     ///
     /// Runs in O(1) time.
     pub fn clear(&mut self) {
         self.ranges.clear();
+    }
+
+    /// Consumes `self`, returning the underlying sorted vector of [`Range`]s.
+    /// 
+    /// # Performance
+    /// 
+    /// Runs in O(1) time.
+    pub fn into_sorted_vec(self) -> Vec<Range<T>> {
+        self.ranges
     }
 }
 
