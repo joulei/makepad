@@ -1,5 +1,6 @@
 mod ast;
 mod case_folder;
+mod char;
 mod char_class;
 mod code_generator;
 mod cursor;
@@ -28,9 +29,15 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new("[^abc][^abc][^abc]");
+        let regex = Regex::new(
+            "[abc]b[abc]",
+            regex::Options {
+                ignore_case: true,
+                ..regex::Options::default()
+            },
+        );
         let mut slots = [None; 2];
-        println!("{:?}", regex.run("xxxaaabbbcccyyy", &mut slots));
+        println!("{:?}", regex.run("xxxaAaBcCcyyy", &mut slots));
         println!("{:?}", slots);
     }
 }

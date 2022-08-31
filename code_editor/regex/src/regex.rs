@@ -12,9 +12,15 @@ pub struct Regex {
 }
 
 impl Regex {
-    pub fn new(pattern: &str) -> Self {
+    pub fn new(pattern: &str, options: Options) -> Self {
         let mut parser = Parser::new();
-        let ast = parser.parse(pattern, parser::Options::default());
+        let ast = parser.parse(
+            pattern,
+            parser::Options {
+                ignore_case: options.ignore_case,
+                ..parser::Options::default()
+            },
+        );
         let mut code_generator = CodeGenerator::new();
         let dfa_program = code_generator.generate(
             &ast,
@@ -85,6 +91,11 @@ impl Regex {
         }
         true
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Options {
+    pub ignore_case: bool,
 }
 
 #[derive(Clone, Debug)]

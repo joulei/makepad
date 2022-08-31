@@ -1,6 +1,6 @@
 use crate::Range;
 
-pub(crate) static CASE_FOLDING: [(Range<char>, i32); 367] = [
+pub(crate) static SIMPLE_CASE_FOLDING: [(Range<char>, i32); 367] = [
     (Range::new('\u{000041}', '\u{00005a}'), 32),
     (Range::new('\u{000061}', '\u{00006a}'), -32),
     (Range::new('\u{00006b}', '\u{00006b}'), 8383),

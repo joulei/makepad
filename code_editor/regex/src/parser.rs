@@ -3,7 +3,7 @@ use {
         ast::{Pred, Quant},
         Ast, CaseFolder, CharClass, Range,
     },
-    std::str::Chars,
+    std::{error, fmt, str::Chars},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -24,12 +24,12 @@ impl Parser {
         ParseContext {
             asts: &mut self.asts,
             groups: &mut self.groups,
-            folder: &mut self.case_folder,
+            case_folder: &mut self.case_folder,
             char_class: &mut self.char_class,
             ch_0: chars.next(),
             ch_1: chars.next(),
             chars,
-            position: 0,
+            byte_position: 0,
             options,
             cap_count: 1,
             group: Group::new(Some(0)),
@@ -40,14 +40,14 @@ impl Parser {
 
 #[derive(Debug)]
 struct ParseContext<'a> {
-    folder: &'a mut CaseFolder,
-    char_class: &'a mut CharClass,
     asts: &'a mut Vec<Ast>,
     groups: &'a mut Vec<Group>,
+    case_folder: &'a mut CaseFolder,
+    char_class: &'a mut CharClass,
     ch_0: Option<char>,
     ch_1: Option<char>,
     chars: Chars<'a>,
-    position: usize,
+    byte_position: usize,
     options: Options,
     cap_count: usize,
     group: Group,
@@ -138,7 +138,13 @@ impl<'a> ParseContext<'a> {
                 Some(ch) => {
                     self.skip_char();
                     self.maybe_push_cat();
-                    self.asts.push(Ast::Char(ch));
+                    self.asts.push(if self.options.ignore_case {
+                        let mut char_class = CharClass::new();
+                        self.case_folder.fold(Range::new(ch, ch), &mut char_class);
+                        Ast::CharClass(char_class)
+                    } else {
+                        Ast::Char(ch)
+                    });
                     self.group.ast_count += 1;
                 }
                 None => break,
@@ -169,7 +175,7 @@ impl<'a> ParseContext<'a> {
                 _ => {
                     let char_range = self.parse_char_range();
                     if self.options.ignore_case {
-                        self.folder.fold(char_range, &mut char_class);
+                        self.case_folder.fold(char_range, &mut char_class);
                     } else {
                         char_class.insert(char_range);
                     }
@@ -212,14 +218,14 @@ impl<'a> ParseContext<'a> {
     }
 
     fn skip_char(&mut self) {
-        self.position += self.ch_0.unwrap().len_utf8();
+        self.byte_position += self.ch_0.unwrap().len_utf8();
         self.ch_0 = self.ch_1;
         self.ch_1 = self.chars.next();
     }
 
     fn skip_two_chars(&mut self) {
-        self.position += self.ch_1.unwrap().len_utf8();
-        self.position += self.ch_1.unwrap().len_utf8();
+        self.byte_position += self.ch_1.unwrap().len_utf8();
+        self.byte_position += self.ch_1.unwrap().len_utf8();
         self.ch_0 = self.chars.next();
         self.ch_1 = self.chars.next();
     }

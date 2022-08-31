@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-"""Generating Unicode tables"""
+"""Parsing Unicode data files"""
 
 import argparse
 import re
@@ -127,73 +127,41 @@ def read_unicode_data(filename, expected_field_count):
         lineno += 1
 
 
-def compute_delta(a, b):
-    if a + 1 == b:
-        if a % 2 == 0:
-            return 1
-        else:
-            return -1
-    if a == b + 1:
-        if a % 2 == 0:
-            return -1
-        else:
-            return 1
-    return b - a
+def contributory_properties(ucd_dir):
+    properties = {}
+    for [code_points, name] in read_unicode_data(ucd_dir + "/PropList.txt", 2):
+        properties.setdefault(name, []).extend(code_points)
+    return properties
 
 
-def apply_delta(a, delta):
-    if delta == 1:
-        if a % 2 == 0:
-            return a + 1
-        else:
-            return a - 1
-    if delta == -1:
-        if a % 2 == 1:
-            return a + 1
-        else:
-            return a - 1
-    return a + delta
+def derived_properties(ucd_dir):
+    properties = {}
+    for [code_points, name] in read_unicode_data(ucd_dir + "/DerivedCoreProperties.txt", 2):
+        properties.setdefault(name, []).extend(code_points)
+    return properties
 
 
-def generate_case_folding_table(ucd_dir):
-    groups = {}
-    for [code_points, status, mapping, *_] in read_unicode_data(ucd_dir + "/CaseFolding.txt", 4):
+def general_category(ucd_dir):
+    property = {}
+    for [code_points, _, value, *_] in read_unicode_data(ucd_dir + "/UnicodeData.txt", 15):
+        property.setdefault(value, []).extend(code_points)
+        if len(value) > 1:
+            property.setdefault(value[0], []).extend(code_points)
+    return property
+
+
+def name_alias(ucd_dir):
+    property = {}
+    for [code_points, value, *_] in read_unicode_data(ucd_dir + "/NameAliases.txt", 3):
+        property.setdefault(value, []).extend(code_points)
+    return property
+
+
+def simple_case_folding(ucd_dir):
+    property = {}
+    for [code_points, status, value, *_] in read_unicode_data(ucd_dir + "/CaseFolding.txt", 4):
         if status not in ("C", "S"):
             continue
-        mapping = parse_code_point(mapping)
-        groups.setdefault(mapping, [mapping]).extend(code_points)
-    groups = list(groups.values())
-    for group in groups:
-        group.sort()
-    groups.sort()
-    pairs = []
-    for group in groups:
-        for index in range(len(group)):
-            pairs.append([group[index - 1], group[index]])
-    pairs.sort()
-    entries = []
-    for a, b in pairs:
-        if entries:
-            [_, prev_last, prev_delta] = entries[-1]
-            if a == prev_last + 1 and b == apply_delta(a, prev_delta):
-                entries[-1][1] = a
-                continue
-        entries.append([a, a, compute_delta(a, b)])
-    print("use crate::Range;")
-    print()
-    print("pub(crate) static CASE_FOLDING: [(Range<char>, i32); %d] = [" % len(entries))
-    for [first, last, delta] in entries:
-        print("    (Range::new('\\u{%06x}', '\\u{%06x}'), %d)," % (first, last, delta))
-    print("];")
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("property_name", type=str)
-    parser.add_argument("ucd_dir", type=str)
-    args = parser.parse_args()
-    if args.property_name == "CaseFolding":
-        generate_case_folding_table(args.ucd_dir) 
-
-if __name__ == '__main__':
-    main()
+        value = parse_code_point(value)
+        property.setdefault(value, [value]).extend(code_points)
+    return property

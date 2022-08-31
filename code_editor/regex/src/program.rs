@@ -59,7 +59,6 @@ impl Instr {
 
     pub fn next_0_mut(&mut self) -> &mut InstrPtr {
         match self {
-            Self::Nop(next_0) => next_0,
             Self::ByteRange(_, next_0) => next_0,
             Self::Char(_, next_0) => next_0,
             Self::CharClass(_, next_0) => next_0,

@@ -186,7 +186,7 @@ impl<T> RangeSet<T> {
             }
             Err(index) => index,
         };
-        if start == end + 1 && self.ranges[start] == range {
+        if start + 1 == end && self.ranges[start] == range {
             return false;
         }
         self.ranges.splice(start..end, iter::once(range));
