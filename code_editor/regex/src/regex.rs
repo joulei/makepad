@@ -12,7 +12,7 @@ pub struct Regex {
 impl Regex {
     pub fn new(pattern: &str) -> Self {
         let mut parser = Parser::new();
-        let ast = parser.parse(pattern);
+        let ast = parser.parse(pattern).unwrap();
         let mut code_generator = CodeGenerator::new();
         let dfa_program = code_generator.generate(
             &ast,
@@ -31,6 +31,7 @@ impl Regex {
             },
         );
         let nfa_program = code_generator.generate(&ast, code_generator::Options::default());
+        println!("EUTA {:?}", nfa_program);
         Self {
             unique: Box::new(RefCell::new(Unique {
                 dfa: Dfa::new(),

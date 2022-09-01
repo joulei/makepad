@@ -3,7 +3,7 @@ use {
         ast::{Pred, Quant},
         Ast, CaseFolder, CharClass, Range,
     },
-    std::str::Chars,
+    std::{error, fmt, result},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -19,17 +19,13 @@ impl Parser {
         Self::default()
     }
 
-    pub(crate) fn parse(&mut self, pattern: &str) -> Ast {
-        let mut chars = pattern.chars();
+    pub(crate) fn parse(&mut self, pattern: &str) -> Result<Ast> {
         ParseContext {
             asts: &mut self.asts,
             groups: &mut self.groups,
             case_folder: &mut self.case_folder,
             char_class: &mut self.char_class,
             pattern,
-            ch_0: chars.next(),
-            ch_1: chars.next(),
-            chars,
             byte_position: 0,
             cap_count: 1,
             group: Group::new(Some(0), Flags::default()),
@@ -45,22 +41,22 @@ struct ParseContext<'a> {
     case_folder: &'a mut CaseFolder,
     char_class: &'a mut CharClass,
     pattern: &'a str,
-    ch_0: Option<char>,
-    ch_1: Option<char>,
-    chars: Chars<'a>,
     byte_position: usize,
     cap_count: usize,
     group: Group,
 }
 
 impl<'a> ParseContext<'a> {
-    fn parse(&mut self) -> Ast {
+    fn parse(&mut self) -> Result<Ast> {
         loop {
             match self.peek_char() {
                 Some('|') => {
                     self.skip_char();
                     self.maybe_push_cat();
                     self.pop_cats();
+                    if self.asts.is_empty() {
+                        return Err(Error);
+                    }
                     self.group.alt_count += 1;
                 }
                 Some('?') => {
@@ -70,7 +66,7 @@ impl<'a> ParseContext<'a> {
                         self.skip_char();
                         non_greedy = true;
                     }
-                    let ast = self.asts.pop().unwrap();
+                    let ast = self.asts.pop().ok_or(Error)?;
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Quest(non_greedy)));
                 }
@@ -81,7 +77,7 @@ impl<'a> ParseContext<'a> {
                         self.skip_char();
                         non_greedy = true;
                     }
-                    let ast = self.asts.pop().unwrap();
+                    let ast = self.asts.pop().ok_or(Error)?;
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Star(non_greedy)));
                 }
@@ -92,9 +88,21 @@ impl<'a> ParseContext<'a> {
                         self.skip_char();
                         non_greedy = true;
                     }
-                    let ast = self.asts.pop().unwrap();
+                    let ast = self.asts.pop().ok_or(Error)?;
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Plus(non_greedy)));
+                }
+                Some('{') => {
+                    match self.try_parse_counted() {
+                        Some((min, max, non_greedy)) => {
+                            let ast = self.asts.pop().ok_or(Error)?;
+                            self.asts.push(Ast::Rep(Box::new(ast), Quant::Counted(min, max, non_greedy)));
+                        }
+                        None => {
+                            self.skip_char();
+                            self.push_char('{');
+                        }
+                    }
                 }
                 Some('^') => {
                     self.skip_char();
@@ -123,7 +131,7 @@ impl<'a> ParseContext<'a> {
                                     self.skip_char();
                                     self.group.flags = flags;
                                 }
-                                _ => panic!(),
+                                _ => return Err(Error),
                             }
                         }
                         _ => self.push_group(false, Flags::default()),
@@ -135,7 +143,7 @@ impl<'a> ParseContext<'a> {
                 }
                 Some('[') => {
                     self.maybe_push_cat();
-                    let char_class = self.parse_char_class();
+                    let char_class = self.parse_char_class()?;
                     self.asts.push(Ast::CharClass(char_class));
                     self.group.ast_count += 1;
                 }
@@ -147,22 +155,53 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(ch) => {
                     self.skip_char();
-                    self.maybe_push_cat();
-                    self.asts.push(if self.group.flags.case_insensitive {
-                        let mut char_class = CharClass::new();
-                        self.case_folder.fold(Range::new(ch, ch), &mut char_class);
-                        Ast::CharClass(char_class)
-                    } else {
-                        Ast::Char(ch)
-                    });
-                    self.group.ast_count += 1;
+                    self.push_char(ch);
                 }
                 None => break,
             }
         }
         self.maybe_push_cat();
         self.pop_alts();
-        self.asts.pop().unwrap()
+        self.asts.pop().ok_or(Error)
+    }
+
+    fn try_parse_counted(&mut self) -> Option<(u32, Option<u32>, bool)> {
+        let byte_position = self.byte_position;
+        self.skip_char();
+        let min = match self.parse_dec_int().ok() {
+            Some(min) => min,
+            None => {
+                self.byte_position = byte_position;
+                return None
+            }
+        };
+        let max = if self.peek_char() == Some(',') {
+            self.skip_char();
+            if self.peek_char() == Some('}') {
+                None
+            } else {
+                match self.parse_dec_int().ok() {
+                    Some(max) => Some(max),
+                    None => {
+                        self.byte_position = byte_position;
+                        return None;
+                    }
+                }
+            }
+        } else {
+            Some(min)
+        };
+        if self.peek_char() != Some('}') {
+            self.byte_position = byte_position;
+            return None;
+        }
+        self.skip_char();
+        let mut non_greedy = false;
+        if self.peek_char() == Some('?') {
+            self.skip_char();
+            non_greedy = true;
+        }
+        Some((min, max, non_greedy))
     }
 
     fn parse_flags(&mut self) -> Flags {
@@ -180,7 +219,7 @@ impl<'a> ParseContext<'a> {
         flags
     }
 
-    fn parse_char_class(&mut self) -> CharClass {
+    fn parse_char_class(&mut self) -> Result<CharClass> {
         use std::mem;
 
         let mut char_class = CharClass::new();
@@ -194,7 +233,8 @@ impl<'a> ParseContext<'a> {
         loop {
             match self.peek_two_chars() {
                 (Some('['), Some(':')) => {
-                    char_class.union(&self.parse_posix_char_class(), &mut self.char_class);
+                    let other_char_class = self.parse_posix_char_class()?;
+                    char_class.union(&other_char_class, &mut self.char_class);
                     mem::swap(&mut char_class, &mut self.char_class);
                     self.char_class.clear();
                 }
@@ -203,7 +243,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 _ => {
-                    let char_range = self.parse_char_range();
+                    let char_range = self.parse_char_range()?;
                     if self.group.flags.case_insensitive {
                         self.case_folder.fold(char_range, &mut char_class);
                     } else {
@@ -218,10 +258,10 @@ impl<'a> ParseContext<'a> {
             mem::swap(&mut char_class, &mut self.char_class);
             self.char_class.clear();
         }
-        char_class
+        Ok(char_class)
     }
 
-    fn parse_posix_char_class(&mut self) -> CharClass {
+    fn parse_posix_char_class(&mut self) -> Result<CharClass> {
         use {crate::posix_char_classes::*, std::mem};
 
         self.skip_two_chars();
@@ -240,7 +280,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 (Some(_), _) => self.skip_char(),
-                (None, _) => panic!(),
+                (None, _) => return Err(Error),
             }
         }
         let mut char_class = CharClass::from_sorted_iter(
@@ -258,7 +298,7 @@ impl<'a> ParseContext<'a> {
                 "upper" => UPPER.as_slice(),
                 "word" => WORD.as_slice(),
                 "xdigit" => XDIGIT.as_slice(),
-                _ => panic!(),
+                _ => return Err(Error),
             }
             .iter()
             .cloned(),
@@ -268,46 +308,62 @@ impl<'a> ParseContext<'a> {
             mem::swap(&mut char_class, &mut self.char_class);
             self.char_class.clear();
         }
-        char_class
+        Ok(char_class)
     }
 
-    fn parse_char_range(&mut self) -> Range<char> {
-        let start = self.parse_char();
-        match self.peek_two_chars() {
+    fn parse_char_range(&mut self) -> Result<Range<char>> {
+        let start = self.parse_char()?;
+        Ok(match self.peek_two_chars() {
             (Some('-'), ch) if ch != Some(']') => {
                 self.skip_char();
-                let end = self.parse_char();
-                return Range::new(start, end);
+                let end = self.parse_char()?;
+                Range::new(start, end)
             }
             _ => Range::new(start, start),
-        }
+        })
     }
 
-    fn parse_char(&mut self) -> char {
-        let ch = self.peek_char().unwrap();
+    fn parse_char(&mut self) -> Result<char> {
+        let ch = self.peek_char().ok_or(Error)?;
         self.skip_char();
-        ch
+        Ok(ch)
+    }
+
+    fn parse_dec_int(&mut self) -> Result<u32> {
+        let ch = match self.peek_char() {
+            Some(ch) if ch.is_digit(10) => ch,
+            _ => return Err(Error),
+        };
+        self.skip_char();
+        let mut value = ch.to_digit(10).unwrap();
+        loop {
+            let ch = match self.peek_char() {
+                Some(ch) if ch.is_digit(10) => ch,
+                _ => break,
+            };
+            self.skip_char();
+            value = value.checked_mul(10).ok_or(Error)? + ch.to_digit(10).unwrap();
+        }
+        Ok(value)
     }
 
     fn peek_char(&self) -> Option<char> {
-        self.ch_0
+        self.pattern[self.byte_position..].chars().next()
     }
 
     fn peek_two_chars(&self) -> (Option<char>, Option<char>) {
-        (self.ch_0, self.ch_1)
+        let mut chars = self.pattern[self.byte_position..].chars();
+        (chars.next(), chars.next())
+
     }
 
     fn skip_char(&mut self) {
-        self.byte_position += self.ch_0.unwrap().len_utf8();
-        self.ch_0 = self.ch_1;
-        self.ch_1 = self.chars.next();
+        self.byte_position += self.peek_char().unwrap().len_utf8();
     }
 
     fn skip_two_chars(&mut self) {
-        self.byte_position += self.ch_1.unwrap().len_utf8();
-        self.byte_position += self.ch_1.unwrap().len_utf8();
-        self.ch_0 = self.chars.next();
-        self.ch_1 = self.chars.next();
+        let (ch_0, ch_1) = self.peek_two_chars();
+        self.byte_position += ch_0.unwrap().len_utf8() + ch_1.unwrap().len_utf8();
     }
 
     fn push_group(&mut self, cap: bool, flags: Flags) {
@@ -334,6 +390,18 @@ impl<'a> ParseContext<'a> {
             self.asts.push(Ast::Capture(Box::new(ast), cap_index));
         }
         self.group = self.groups.pop().unwrap();
+        self.group.ast_count += 1;
+    }
+
+    fn push_char(&mut self, ch: char) {
+        self.maybe_push_cat();
+        self.asts.push(if self.group.flags.case_insensitive {
+            let mut char_class = CharClass::new();
+            self.case_folder.fold(Range::new(ch, ch), &mut char_class);
+            Ast::CharClass(char_class)
+        } else {
+            Ast::Char(ch)
+        });
         self.group.ast_count += 1;
     }
 
@@ -366,6 +434,19 @@ impl<'a> ParseContext<'a> {
         self.asts.push(Ast::Cat(asts));
         self.group.ast_count -= self.group.cat_count;
         self.group.cat_count = 0;
+    }
+}
+
+pub type Result<T> = result::Result<T, Error>;
+
+#[derive(Clone, Debug)]
+pub struct Error;
+
+impl error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
     }
 }
 

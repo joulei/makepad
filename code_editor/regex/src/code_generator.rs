@@ -91,6 +91,43 @@ impl<'a> CompileContext<'a> {
                 let frag = self.generate_recursive(ast);
                 self.generate_plus(frag, non_greedy)
             }
+            Ast::Rep(ref ast, Quant::Counted(min, max, non_greedy)) => {
+                let frag_0 = if min > 0 {
+                    let mut acc_frag = self.generate_recursive(ast);
+                    for _ in 0..min {
+                        let frag = self.generate_recursive(ast);
+                        acc_frag = self.generate_cat(acc_frag, frag);
+                    }
+                    Some(acc_frag)
+                } else {
+                    None
+                };
+                let frag_1 = match max {
+                    Some(max) => {
+                        if min < max {
+                            let frag = self.generate_recursive(ast);
+                            let mut acc_frag = self.generate_quest(frag, non_greedy);
+                            for _ in min..max {
+                                let frag = self.generate_recursive(ast);
+                                let frag = self.generate_cat(frag, acc_frag);
+                                acc_frag = self.generate_quest(frag, non_greedy);
+                            }
+                            Some(acc_frag)
+                        } else {
+                            None
+                        }
+                    }
+                    None => {
+                        let frag = self.generate_recursive(ast);
+                        Some(self.generate_star(frag, non_greedy))
+                    }
+                };
+                match (frag_0, frag_1) {
+                    (Some(frag_0), Some(frag_1)) => self.generate_cat(frag_0, frag_1),
+                    (Some(frag), _) | (_, Some(frag)) => frag,
+                    (None, None) => self.generate_empty(),
+                }
+            },
             Ast::Cat(ref asts) => {
                 let mut asts = asts.iter();
                 let mut acc_frag = self.generate_recursive(asts.next().unwrap());
@@ -285,6 +322,14 @@ impl<'a> CompileContext<'a> {
         Frag {
             start: self.emit_instr(Instr::Split(frag_0.start, frag_1.start)),
             ends: frag_0.ends.concat(frag_1.ends, &mut self.instrs),
+        }
+    }
+
+    fn generate_empty(&mut self) -> Frag {
+        let instr = self.emit_instr(Instr::Nop(program::NULL_INSTR_PTR));
+        Frag { 
+            start: instr,
+            ends: HolePtrList::unit(HolePtr::next_0(instr))
         }
     }
 

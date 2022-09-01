@@ -30,9 +30,9 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new("[[:^alpha:]]+");
+        let regex = Regex::new("[abc]{1,3}");
         let mut slots = [None; 2];
-        println!("{:?}", regex.run("xxxa123AaBcCcyyy", &mut slots));
+        println!("{:?}", regex.run("xxxabcyyy", &mut slots));
         println!("{:?}", slots);
     }
 }

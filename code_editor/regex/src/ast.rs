@@ -22,4 +22,5 @@ pub(crate) enum Quant {
     Quest(bool),
     Star(bool),
     Plus(bool),
+    Counted(u32, Option<u32>, bool),
 }
