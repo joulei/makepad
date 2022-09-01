@@ -12,12 +12,12 @@ impl CharExt for char {
     }
 
     fn is_word(self) -> bool {
-        use crate::unicode_tables::compatibility_properties;
-
+        use crate::posix_char_classes;
+        
         if self.is_ascii() && self.is_ascii_word() {
             return true;
         }
-        compatibility_properties::WORD
+        posix_char_classes::WORD
             .binary_search_by(|range| {
                 use std::cmp::Ordering;
 

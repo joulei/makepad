@@ -20,14 +20,14 @@ def print_table(name, code_points):
 def main():
     ucd_dir = sys.argv[1]
 
-    general_category = unicode.general_category(ucd_dir)
-    name_alias = unicode.name_alias(ucd_dir)
+    categories = unicode.categories(ucd_dir)
+    name_alias = unicode.aliases(ucd_dir)
     derived_properties = unicode.derived_properties(ucd_dir)
     contributory_properties = unicode.contributory_properties(ucd_dir)
 
     alnum = set()
     alnum.update(derived_properties["Alphabetic"])
-    alnum.update(general_category["Nd"])
+    alnum.update(categories["Nd"])
     alnum = sorted(alnum)
     
     alpha = set()
@@ -35,24 +35,24 @@ def main():
     alpha = sorted(alpha)
 
     blank = set()
-    blank.update(general_category["Zs"])
+    blank.update(categories["Zs"])
     blank.update(name_alias["CHARACTER TABULATION"])
     blank = sorted(blank)
 
     cntrl = set()
-    cntrl.update(general_category["Cc"])
+    cntrl.update(categories["Cc"])
     cntrl = sorted(cntrl)
 
     digit = set()
-    digit.update(general_category["Nd"])
+    digit.update(categories["Nd"])
     digit = sorted(digit)
 
     graph = set()
     graph.update(range(0, 0xD800))
     graph.update(range(0xE000, 0x110000))
     graph.difference_update(contributory_properties["White_Space"])
-    graph.difference_update(general_category["Cc"])
-    graph.difference_update(general_category["Cs"])
+    graph.difference_update(categories["Cc"])
+    graph.difference_update(categories["Cs"])
     graph = sorted(digit)
 
     lower = set()
@@ -63,15 +63,15 @@ def main():
     print_.update(range(0, 0xD800))
     print_.update(range(0xE000, 0x110000))
     print_.difference_update(contributory_properties["White_Space"])
-    print_.difference_update(general_category["Cc"])
-    print_.difference_update(general_category["Cs"])
-    print_.update(general_category["Zs"])
+    print_.difference_update(categories["Cc"])
+    print_.difference_update(categories["Cs"])
+    print_.update(categories["Zs"])
     print_.update(name_alias["CHARACTER TABULATION"])
-    print_.difference_update(general_category["Cc"])
+    print_.difference_update(categories["Cc"])
     print_ = sorted(print_)
 
     punct = set()
-    punct.update(general_category["P"])
+    punct.update(categories["P"])
     punct = sorted(punct)
 
     space = set()
@@ -84,14 +84,14 @@ def main():
 
     word = set()
     word.update(derived_properties["Alphabetic"])
-    word.update(general_category["M"])
-    word.update(general_category["Nd"])
-    word.update(general_category["Pc"])
+    word.update(categories["M"])
+    word.update(categories["Nd"])
+    word.update(categories["Pc"])
     word.update(contributory_properties["Join_Control"])
     word = sorted(word)
 
     xdigit = set()
-    xdigit.update(general_category["Nd"])
+    xdigit.update(categories["Nd"])
     xdigit.update(contributory_properties["Hex_Digit"])
     xdigit = sorted(xdigit)
 

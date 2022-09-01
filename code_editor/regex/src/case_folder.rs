@@ -7,8 +7,6 @@ pub(crate) struct CaseFolder {
 
 impl CaseFolder {
     pub(crate) fn fold(&mut self, char_range: Range<char>, output: &mut CharClass) {
-        use crate::unicode_tables;
-
         self.stack
             .push(Range::new(char_range.start as u32, char_range.end as u32));
         while let Some(mut range) = self.stack.pop() {
@@ -19,7 +17,7 @@ impl CaseFolder {
                 continue;
             }
             while range.start <= range.end {
-                match unicode_tables::SIMPLE_CASE_FOLDING.binary_search_by(|(other_range, _)| {
+                match crate::CASE_FOLDS.binary_search_by(|(other_range, _)| {
                     use std::cmp::Ordering;
 
                     if (other_range.end as u32) < range.start {
@@ -31,7 +29,7 @@ impl CaseFolder {
                     Ordering::Equal
                 }) {
                     Ok(index) => {
-                        let (other_range, delta) = unicode_tables::SIMPLE_CASE_FOLDING[index];
+                        let (other_range, delta) = crate::CASE_FOLDS[index];
                         self.stack.push(apply_delta(
                             Range::new(range.start, range.end.min(other_range.end as u32)),
                             delta,
@@ -39,8 +37,8 @@ impl CaseFolder {
                         range.start = other_range.end as u32 + 1;
                     }
                     Err(index) => {
-                        if index < unicode_tables::SIMPLE_CASE_FOLDING.len() {
-                            let (other_range, _) = unicode_tables::SIMPLE_CASE_FOLDING[index];
+                        if index < crate::CASE_FOLDS.len() {
+                            let (other_range, _) = crate::CASE_FOLDS[index];
                             range.start = other_range.start as u32;
                         } else {
                             break;

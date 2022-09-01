@@ -194,7 +194,7 @@ impl<'a> ParseContext<'a> {
         loop {
             match self.peek_two_chars() {
                 (Some('['), Some(':')) => {
-                    char_class.union(&self.parse_named_char_class(), &mut self.char_class);
+                    char_class.union(&self.parse_posix_char_class(), &mut self.char_class);
                     mem::swap(&mut char_class, &mut self.char_class);
                     self.char_class.clear();
                 }
@@ -221,8 +221,8 @@ impl<'a> ParseContext<'a> {
         char_class
     }
 
-    fn parse_named_char_class(&mut self) -> CharClass {
-        use {crate::unicode_tables::compatibility_properties, std::mem};
+    fn parse_posix_char_class(&mut self) -> CharClass {
+        use {crate::posix_char_classes::*, std::mem};
 
         self.skip_two_chars();
         let mut negated = false;
@@ -245,19 +245,19 @@ impl<'a> ParseContext<'a> {
         }
         let mut char_class = CharClass::from_sorted_iter(
             match &self.pattern[start..end] {
-                "alnum" => compatibility_properties::ALNUM.as_slice(),
-                "alpha" => compatibility_properties::ALPHA.as_slice(),
-                "blank" => compatibility_properties::BLANK.as_slice(),
-                "cntrl" => compatibility_properties::CNTRL.as_slice(),
-                "digit" => compatibility_properties::DIGIT.as_slice(),
-                "graph" => compatibility_properties::GRAPH.as_slice(),
-                "lower" => compatibility_properties::LOWER.as_slice(),
-                "print" => compatibility_properties::PRINT.as_slice(),
-                "punct" => compatibility_properties::PUNCT.as_slice(),
-                "space" => compatibility_properties::SPACE.as_slice(),
-                "upper" => compatibility_properties::UPPER.as_slice(),
-                "word" => compatibility_properties::WORD.as_slice(),
-                "xdigit" => compatibility_properties::XDIGIT.as_slice(),
+                "alnum" => ALNUM.as_slice(),
+                "alpha" => ALPHA.as_slice(),
+                "blank" => BLANK.as_slice(),
+                "cntrl" => CNTRL.as_slice(),
+                "digit" => DIGIT.as_slice(),
+                "graph" => GRAPH.as_slice(),
+                "lower" => LOWER.as_slice(),
+                "print" => PRINT.as_slice(),
+                "punct" => PUNCT.as_slice(),
+                "space" => SPACE.as_slice(),
+                "upper" => UPPER.as_slice(),
+                "word" => WORD.as_slice(),
+                "xdigit" => XDIGIT.as_slice(),
                 _ => panic!(),
             }
             .iter()

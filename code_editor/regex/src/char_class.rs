@@ -29,10 +29,6 @@ impl CharClass {
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.range_set.is_empty()
-    }
-
     pub(crate) fn contains(&self, ch: char) -> bool {
         self.range_set.contains(&(ch as u32..ch as u32 + 1))
     }

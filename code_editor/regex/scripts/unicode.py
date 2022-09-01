@@ -126,12 +126,21 @@ def read_unicode_data(filename, expected_field_count):
         yield fields
         lineno += 1
 
+    
+def categories(ucd_dir):
+    categories = {}
+    for [code_points, _, category, *_] in read_unicode_data(ucd_dir + "/UnicodeData.txt", 15):
+        categories.setdefault(category, []).extend(code_points)
+        if len(category) > 1:
+            categories.setdefault(category[0], []).extend(code_points)
+    return categories
 
-def contributory_properties(ucd_dir):
-    properties = {}
-    for [code_points, name] in read_unicode_data(ucd_dir + "/PropList.txt", 2):
-        properties.setdefault(name, []).extend(code_points)
-    return properties
+
+def aliases(ucd_dir):
+    aliases = {}
+    for [code_points, alias, *_] in read_unicode_data(ucd_dir + "/NameAliases.txt", 3):
+        aliases.setdefault(alias, []).extend(code_points)
+    return aliases
 
 
 def derived_properties(ucd_dir):
@@ -141,27 +150,18 @@ def derived_properties(ucd_dir):
     return properties
 
 
-def general_category(ucd_dir):
-    property = {}
-    for [code_points, _, value, *_] in read_unicode_data(ucd_dir + "/UnicodeData.txt", 15):
-        property.setdefault(value, []).extend(code_points)
-        if len(value) > 1:
-            property.setdefault(value[0], []).extend(code_points)
-    return property
+def contributory_properties(ucd_dir):
+    properties = {}
+    for [code_points, name] in read_unicode_data(ucd_dir + "/PropList.txt", 2):
+        properties.setdefault(name, []).extend(code_points)
+    return properties
 
 
-def name_alias(ucd_dir):
-    property = {}
-    for [code_points, value, *_] in read_unicode_data(ucd_dir + "/NameAliases.txt", 3):
-        property.setdefault(value, []).extend(code_points)
-    return property
-
-
-def simple_case_folding(ucd_dir):
-    property = {}
-    for [code_points, status, value, *_] in read_unicode_data(ucd_dir + "/CaseFolding.txt", 4):
+def case_folds(ucd_dir):
+    case_folds = {}
+    for [code_points, status, lower, *_] in read_unicode_data(ucd_dir + "/CaseFolding.txt", 4):
         if status not in ("C", "S"):
             continue
-        value = parse_code_point(value)
-        property.setdefault(value, [value]).extend(code_points)
-    return property
+        lower = parse_code_point(lower)
+        case_folds.setdefault(lower, [lower]).extend(code_points)
+    return case_folds

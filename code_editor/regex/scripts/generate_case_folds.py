@@ -59,7 +59,7 @@ def main():
     print()
     print("use crate::Range;")
     print()
-    print("pub(crate) static SIMPLE_CASE_FOLDING: [(Range<char>, i32); %d] = [" % len(entries))
+    print("pub(crate) static CASE_FOLDS: [(Range<char>, i32); %d] = [" % len(entries))
     for [first, last, delta] in entries:
         print("    (Range::new('\\u{%06x}', '\\u{%06x}'), %d)," % (first, last, delta))
     print("];")
