@@ -23,7 +23,7 @@ impl CodeGenerator {
 
     pub(crate) fn generate(&mut self, ast: &Ast, options: Options) -> Program {
         CompileContext {
-            encoder: &mut self.utf8_encoder,
+            utf8_encoder: &mut self.utf8_encoder,
             states: &mut self.states,
             instr_cache: &mut self.instr_cache,
             options,
@@ -43,7 +43,7 @@ pub(crate) struct Options {
 
 #[derive(Debug)]
 struct CompileContext<'a> {
-    encoder: &'a mut Utf8Encoder,
+    utf8_encoder: &'a mut Utf8Encoder,
     states: &'a mut Vec<State>,
     instr_cache: &'a mut HashMap<Instr, InstrPtr>,
     options: Options,
@@ -197,13 +197,13 @@ impl<'a> CompileContext<'a> {
             };
             if self.options.reverse {
                 for char_range in char_class {
-                    for byte_ranges in self.encoder.encode(char_range) {
+                    for byte_ranges in self.utf8_encoder.encode(char_range) {
                         suffix_tree.add_byte_ranges(&byte_ranges);
                     }
                 }
             } else {
                 for char_range in char_class {
-                    for mut byte_ranges in self.encoder.encode(char_range) {
+                    for mut byte_ranges in self.utf8_encoder.encode(char_range) {
                         byte_ranges.reverse();
                         suffix_tree.add_byte_ranges(&byte_ranges);
                     }

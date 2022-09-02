@@ -75,11 +75,12 @@ def read_unicode_data(filename, expected_field_count):
     files specify these in two different ways, either by the form "X..Y", or
     by entries for the start and end characters of the range.
     """
-    file = open(filename, encoding="utf8")
-    lineno = 1
+    lineno = 0
     first = None
     expected_name = None
-    for line in file:
+    for line in open(filename, encoding="utf8"):
+        lineno += 1
+
         # Strip out comments and whitespace, and skip empty lines.
         hash = line.find("#")
         if hash >= 0:
@@ -124,7 +125,6 @@ def read_unicode_data(filename, expected_field_count):
             raise e.with_traceback(e.__traceback__)   
         fields[0] = code_points
         yield fields
-        lineno += 1
 
     
 def categories(ucd_dir):

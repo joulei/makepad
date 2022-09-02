@@ -2,7 +2,8 @@
 
 import unicode
 import sys
-    
+
+  
 def print_table(name, code_points):
     entries = []
     for code_point in sorted(code_points):
@@ -121,6 +122,7 @@ def main():
             print()
         print_table(name, code_points)
         first = False
+
 
 if __name__ == '__main__':
     main()
