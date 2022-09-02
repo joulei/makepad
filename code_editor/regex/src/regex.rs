@@ -1,6 +1,6 @@
 use {
     crate::{code_generator, dfa, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
-    std::{cell::RefCell, sync::Arc},
+    std::{cell::RefCell, ops::Range, sync::Arc},
 };
 
 #[derive(Clone, Debug)]
@@ -31,7 +31,6 @@ impl Regex {
             },
         );
         let nfa_program = code_generator.generate(&ast, code_generator::Options::default());
-        println!("EUTA {:?}", nfa_program);
         Self {
             unique: Box::new(RefCell::new(Unique {
                 dfa: Dfa::new(),
@@ -46,8 +45,8 @@ impl Regex {
         }
     }
 
-    pub fn run(&self, string: &str, slots: &mut [Option<usize>]) -> bool {
-        self.run_with_cursor(StrCursor::new(string), slots)
+    pub fn run(&self, haystack: &str, slots: &mut [Option<usize>]) -> bool {
+        self.run_with_cursor(StrCursor::new(haystack), slots)
     }
 
     pub fn run_with_cursor<C: Cursor>(&self, mut cursor: C, slots: &mut [Option<usize>]) -> bool {
@@ -84,6 +83,11 @@ impl Regex {
         }
         true
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Submatches {
+    slots: Box<[Option<usize>]>,
 }
 
 #[derive(Clone, Debug)]
