@@ -142,8 +142,8 @@ impl<'a> ParseContext<'a> {
                     self.pop_group();
                 }
                 Some('[') => {
-                    self.maybe_push_cat();
                     let char_class = self.parse_char_class()?;
+                    self.maybe_push_cat();
                     self.asts.push(Ast::CharClass(char_class));
                     self.group.ast_count += 1;
                 }
@@ -152,6 +152,19 @@ impl<'a> ParseContext<'a> {
                     self.maybe_push_cat();
                     self.asts.push(Ast::CharClass(CharClass::any()));
                     self.group.ast_count += 1;
+                }
+                Some('\\') => {
+                    match self.try_parse_escaped_char_class() {
+                        Some(char_class) => {
+                            self.maybe_push_cat();
+                            self.asts.push(Ast::CharClass(char_class));
+                            self.group.ast_count += 1;
+                        }
+                        None => {
+                            let ch = self.parse_escaped_char()?;
+                            self.push_char(ch);
+                        }
+                    }
                 }
                 Some(ch) => {
                     self.skip_char();
@@ -327,6 +340,25 @@ impl<'a> ParseContext<'a> {
         let ch = self.peek_char().ok_or(Error)?;
         self.skip_char();
         Ok(ch)
+    }
+
+    fn try_parse_escaped_char_class(&mut self) -> Option<CharClass> {
+        None
+    }
+
+    fn parse_escaped_char(&mut self) -> Result<char> {
+        use crate::char::CharExt;
+
+        self.skip_char();
+        let c = match self.peek_char() {
+            Some('n') => '\n',
+            Some('r') => '\r',
+            Some('t') => '\t',
+            Some(c) if !c.is_word() => c,
+            _ => return Err(Error),
+        };
+        self.skip_char();
+        Ok(c)
     }
 
     fn parse_dec_int(&mut self) -> Result<u32> {

@@ -47,7 +47,10 @@ impl Nfa {
             if self.current_threads.instrs.is_empty() {
                 break;
             }
-            let ch = cursor.next_char();
+            let ch = cursor.current_char();
+            if ch.is_some() {
+                cursor.move_next_char();
+            }
             for &instr in &self.current_threads.instrs {
                 match program.instrs[instr] {
                     Instr::Match => {
