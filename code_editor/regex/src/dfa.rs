@@ -81,34 +81,27 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         let mut matched = None;
         let mut current_state = UNKNOWN_STATE_PTR;
         let mut next_state = self.get_or_create_start_state();
-        let mut byte = self.cursor.next_byte();
-        loop {
-            while next_state <= MAX_STATE_PTR && byte.is_some() {
+        while !self.cursor.is_at_end_of_text() {
+            while next_state <= MAX_STATE_PTR && !self.cursor.is_at_end_of_text() {
                 current_state = next_state;
-                next_state = *self.states.next_state(current_state, byte);
-                byte = self.cursor.next_byte();
+                next_state = *self.states.next_state(current_state, self.cursor.next_byte());
+            }
+            if next_state == UNKNOWN_STATE_PTR {
+                let byte = Some(self.cursor.prev_byte().unwrap());
+                self.cursor.next_byte().unwrap();
+                next_state = self.get_or_create_next_state(current_state, byte);
+                *self.states.next_state_mut(current_state, byte) = next_state;
             }
             if next_state & MATCHED_FLAG != 0 {
                 self.cursor.prev_byte().unwrap();
-                self.cursor.prev_byte().unwrap();
                 matched = Some(self.cursor.byte_position());
-                self.cursor.next_byte().unwrap();
                 self.cursor.next_byte().unwrap();
                 if self.options.stop_after_first_match {
                     return matched;
                 }
                 next_state &= !MATCHED_FLAG;
-            } else if next_state == UNKNOWN_STATE_PTR {
-                self.cursor.prev_byte().unwrap();
-                let byte = Some(self.cursor.prev_byte().unwrap());
-                self.cursor.next_byte().unwrap();
-                self.cursor.next_byte().unwrap();
-                next_state = self.get_or_create_next_state(current_state, byte);
-                *self.states.next_state_mut(current_state, byte) = next_state;
             } else if next_state == DEAD_STATE_PTR {
                 return matched;
-            } else {
-                break;
             }
         }
         next_state &= MAX_STATE_PTR;
@@ -193,13 +186,14 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 _ => {}
             }
         }
-        self.current_threads.instrs.clear();
         if !flags.matched() && self.next_threads.instrs.is_empty() {
             return DEAD_STATE_PTR;
         }
         let next_state_id = StateId::new(flags, self.next_threads.instrs.as_slice());
+        self.current_threads.instrs.clear();
         self.next_threads.instrs.clear();
         let mut next_state = self.states.get_or_create_state(next_state_id);
+
         if flags.matched() {
             next_state |= MATCHED_FLAG;
         }

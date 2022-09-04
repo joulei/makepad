@@ -125,7 +125,7 @@ impl<'a> ParseContext<'a> {
                             match self.peek_char() {
                                 Some(':') => {
                                     self.skip_char();
-                                    self.push_group(true, flags);
+                                    self.push_group(false, flags);
                                 }
                                 Some(')') => {
                                     self.skip_char();
@@ -134,7 +134,7 @@ impl<'a> ParseContext<'a> {
                                 _ => return Err(Error),
                             }
                         }
-                        _ => self.push_group(false, Flags::default()),
+                        _ => self.push_group(true, Flags::default()),
                     };
                 }
                 Some(')') => {
@@ -477,7 +477,7 @@ pub struct Error;
 impl error::Error for Error {}
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Ok(())
     }
 }

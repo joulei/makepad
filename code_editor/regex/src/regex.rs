@@ -86,11 +86,6 @@ impl Regex {
 }
 
 #[derive(Clone, Debug)]
-pub struct Submatches {
-    slots: Box<[Option<usize>]>,
-}
-
-#[derive(Clone, Debug)]
 struct Unique {
     dfa: Dfa,
     reverse_dfa: Dfa,

@@ -9,7 +9,7 @@ macro_rules! test_regex {
             let expected: Vec<Option<usize>> = vec![$($expected),*];
             let mut actual = vec![None; expected.len()];
             regex.run(haystack, &mut actual);
-            assert_eq!(expected, actual);
+            assert_eq!(actual, expected);
         }
     );
 }
