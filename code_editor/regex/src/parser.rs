@@ -49,8 +49,8 @@ struct ParseContext<'a> {
 impl<'a> ParseContext<'a> {
     fn parse(&mut self) -> Result<Ast, ParseError> {
         loop {
-            match self.peek_char() {
-                Some('|') => {
+            match self.peek_two_chars() {
+                (Some('|'), _) => {
                     self.skip_char();
                     self.maybe_push_cat();
                     self.pop_cats();
@@ -59,7 +59,7 @@ impl<'a> ParseContext<'a> {
                     }
                     self.group.alt_count += 1;
                 }
-                Some('?') => {
+                (Some('?'), _) => {
                     self.skip_char();
                     let mut non_greedy = false;
                     if self.peek_char() == Some('?') {
@@ -70,7 +70,7 @@ impl<'a> ParseContext<'a> {
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Quest(non_greedy)));
                 }
-                Some('*') => {
+                (Some('*'), _) => {
                     self.skip_char();
                     if self.asts.is_empty() {
                         self.push_char('*');
@@ -85,7 +85,7 @@ impl<'a> ParseContext<'a> {
                             .push(Ast::Rep(Box::new(ast), Quant::Star(non_greedy)));
                     }
                 }
-                Some('+') => {
+                (Some('+'), _) => {
                     self.skip_char();
                     let mut non_greedy = false;
                     if self.peek_char() == Some('?') {
@@ -96,7 +96,7 @@ impl<'a> ParseContext<'a> {
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Plus(non_greedy)));
                 }
-                Some('{') => match self.try_parse_counted() {
+                (Some('{'), _) => match self.try_parse_counted() {
                     Some((min, max, non_greedy)) => {
                         let ast = self.asts.pop().ok_or(ParseError)?;
                         self.asts.push(Ast::Rep(
@@ -109,19 +109,31 @@ impl<'a> ParseContext<'a> {
                         self.push_char('{');
                     }
                 },
-                Some('^') => {
+                (Some('^'), _) => {
                     self.skip_char();
                     self.maybe_push_cat();
                     self.asts.push(Ast::Assert(Pred::IsAtStartOfText));
                     self.group.ast_count += 1;
                 }
-                Some('$') => {
+                (Some('$'), _) => {
                     self.skip_char();
                     self.maybe_push_cat();
                     self.asts.push(Ast::Assert(Pred::IsAtEndOfText));
                     self.group.ast_count += 1;
                 }
-                Some('(') => {
+                (Some('\\'), Some('b')) => {
+                    self.skip_char();
+                    self.maybe_push_cat();
+                    self.asts.push(Ast::Assert(Pred::IsAtWordBoundary));
+                    self.group.ast_count += 1;
+                }
+                (Some('\\'), Some('B')) => {
+                    self.skip_char();
+                    self.maybe_push_cat();
+                    self.asts.push(Ast::Assert(Pred::IsNotAtWordBoundary));
+                    self.group.ast_count += 1;
+                }
+                (Some('('), _) => {
                     self.skip_char();
                     let mut non_capturing = false;
                     match self.peek_two_chars() {
@@ -133,38 +145,32 @@ impl<'a> ParseContext<'a> {
                     };
                     self.push_group(non_capturing, Flags::default());
                 }
-                Some(')') => {
+                (Some(')'), _) => {
                     self.skip_char();
                     self.pop_group()?;
                 }
-                Some('[') => {
+                (Some('['), _) => {
                     let char_class = self.parse_char_class()?;
-                    self.maybe_push_cat();
-                    self.asts.push(Ast::CharClass(char_class));
-                    self.group.ast_count += 1;
+                    self.push_char_class(char_class);
                 }
-                Some('.') => {
+                (Some('.'), _) => {
                     self.skip_char();
-                    self.maybe_push_cat();
-                    self.asts.push(Ast::CharClass(CharClass::any()));
-                    self.group.ast_count += 1;
+                    self.push_char_class(CharClass::any());
                 }
-                Some('\\') => match self.try_parse_escaped_char_class() {
+                (Some('\\'), _) => match self.try_parse_escaped_char_class() {
                     Some(char_class) => {
-                        self.maybe_push_cat();
-                        self.asts.push(Ast::CharClass(char_class));
-                        self.group.ast_count += 1;
+                        self.push_char_class(char_class);
                     }
                     None => {
                         let ch = self.parse_escaped_char()?;
                         self.push_char(ch);
                     }
                 },
-                Some(ch) => {
+                (Some(ch), _) => {
                     self.skip_char();
                     self.push_char(ch);
                 }
-                None => break,
+                (None, _) => break,
             }
         }
         self.maybe_push_cat();
@@ -224,24 +230,27 @@ impl<'a> ParseContext<'a> {
         let mut first = true;
         loop {
             match self.peek_two_chars() {
+                (Some(']'), _) if !first => {
+                    self.skip_char();
+                    break;
+                }
                 (Some('['), Some(':')) => {
                     let other_char_class = self.parse_posix_char_class()?;
                     char_class.union(&other_char_class, &mut self.char_class);
                     mem::swap(&mut char_class, &mut self.char_class);
                     self.char_class.clear();
                 }
-                (Some(']'), _) if !first => {
-                    self.skip_char();
-                    break;
-                }
-                _ => {
-                    let char_range = self.parse_char_range()?;
-                    if self.group.flags.case_insensitive {
-                        self.case_folder.fold(char_range, &mut char_class);
-                    } else {
-                        char_class.insert(char_range);
+                (Some(_), _) => match self.try_parse_escaped_char_class() {
+                    Some(other_char_class) => {
+                        char_class.union(&other_char_class, &mut self.char_class);
+                        mem::swap(&mut char_class, &mut self.char_class);
+                        self.char_class.clear();
                     }
-                }
+                    None => {
+                        char_class.insert(self.parse_char_range()?);
+                    }
+                },
+                (None, _) => return Err(ParseError),
             }
             first = false;
         }
@@ -322,7 +331,36 @@ impl<'a> ParseContext<'a> {
     }
 
     fn try_parse_escaped_char_class(&mut self) -> Option<CharClass> {
-        None
+        use {crate::posix_char_classes::*, std::mem};
+
+        match self.peek_two_chars() {
+            (Some('\\'), Some(ch)) => {
+                let mut negated = false;
+                if ch.is_ascii_uppercase() {
+                    negated = true;
+                }
+                let ranges = match ch.to_ascii_lowercase() {
+                    'd' => Some(DIGIT.as_slice()),
+                    's' => Some(SPACE.as_slice()),
+                    'w' => Some(WORD.as_slice()),
+                    _ => None,
+                };
+                match ranges {
+                    Some(ranges) => {
+                        self.skip_two_chars();
+                        let mut char_class = CharClass::from_sorted_iter(ranges.iter().cloned());
+                        if negated {
+                            char_class.negate(&mut self.char_class);
+                            mem::swap(&mut char_class, &mut self.char_class);
+                            self.char_class.clear();
+                        }
+                        Some(char_class)
+                    }
+                    None => None,
+                }
+            }
+            _ => None,
+        }
     }
 
     fn parse_escaped_char(&mut self) -> Result<char, ParseError> {
@@ -409,15 +447,31 @@ impl<'a> ParseContext<'a> {
         Ok(())
     }
 
-    fn push_char(&mut self, ch: char) {
+    fn push_char_class(&mut self, mut char_class: CharClass) {
+        use std::mem;
+
+        if self.group.flags.case_insensitive {
+            for char_range in &char_class {
+                self.case_folder.fold(char_range, &mut self.char_class);
+            }
+            mem::swap(&mut char_class, &mut self.char_class);
+            self.char_class.clear();
+        }
         self.maybe_push_cat();
-        self.asts.push(if self.group.flags.case_insensitive {
+        self.asts.push(Ast::CharClass(char_class));
+        self.group.ast_count += 1;
+    }
+
+    fn push_char(&mut self, ch: char) {
+        let ast = if self.group.flags.case_insensitive {
             let mut char_class = CharClass::new();
             self.case_folder.fold(Range::new(ch, ch), &mut char_class);
             Ast::CharClass(char_class)
         } else {
             Ast::Char(ch)
-        });
+        };
+        self.maybe_push_cat();
+        self.asts.push(ast);
         self.group.ast_count += 1;
     }
 

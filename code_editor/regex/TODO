@@ -1,0 +1,13 @@
+Add a function for pushing classes that are already folded in the parser
+Add a function for pushing arbitrary ast fragments in the parser
+Set non-ascii transitions to error if program has word boundary
+Parse word boundary assertions
+Rename cap to capture
+Rename pred to predicate
+Rename quant to quantifier
+Rename quest to zero_or_one
+Rename star to zero_or_more
+Rename plus to one_or_more
+Move non greedy argument to ast
+Generalize property functions in unicode.py
+Clean up how we reverse predicates in code generator
