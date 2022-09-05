@@ -84,4 +84,6 @@ pub(crate) type InstrPtr = usize;
 pub(crate) enum Pred {
     IsAtStartOfText,
     IsAtEndOfText,
+    IsAtWordBoundary,
+    IsNotAtWordBoundary,
 }

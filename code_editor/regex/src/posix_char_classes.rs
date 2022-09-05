@@ -1507,13 +1507,9 @@ pub(crate) static CNTRL: [Range<char>; 2] = [
     Range::new('\u{007F}', '\u{009F}'),
 ];
 
-pub(crate) static DIGIT: [Range<char>; 1] = [
-    Range::new('\u{0030}', '\u{0039}'),
-];
+pub(crate) static DIGIT: [Range<char>; 1] = [Range::new('\u{0030}', '\u{0039}')];
 
-pub(crate) static GRAPH: [Range<char>; 1] = [
-    Range::new('\u{0030}', '\u{0039}'),
-];
+pub(crate) static GRAPH: [Range<char>; 1] = [Range::new('\u{0030}', '\u{0039}')];
 
 pub(crate) static LOWER: [Range<char>; 668] = [
     Range::new('\u{0061}', '\u{007A}'),

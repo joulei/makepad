@@ -23,6 +23,7 @@ impl Nfa {
         &mut self,
         program: &Program,
         mut cursor: C,
+        options: Options,
         slots: &mut [Option<usize>],
     ) -> bool {
         use std::mem;
@@ -53,6 +54,9 @@ impl Nfa {
                     Instr::Match => {
                         let len = slots.len().min(self.current_threads.slots.get(instr).len());
                         slots[..len].copy_from_slice(&self.current_threads.slots.get(instr)[..len]);
+                        if options.stop_after_first_match {
+                            return true;
+                        }
                         matched = true;
                         break;
                     }
@@ -89,6 +93,11 @@ impl Nfa {
         }
         matched
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Options {
+    pub(crate) stop_after_first_match: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -138,6 +147,8 @@ impl Threads {
                             if match pred {
                                 Pred::IsAtStartOfText => cursor.is_at_start_of_text(),
                                 Pred::IsAtEndOfText => cursor.is_at_end_of_text(),
+                                Pred::IsAtWordBoundary => cursor.is_at_word_boundary(),
+                                Pred::IsNotAtWordBoundary => !cursor.is_at_word_boundary(),
                             } {
                                 instr = next;
                             }

@@ -1,7 +1,10 @@
 pub trait Cursor {
     fn is_at_start_of_text(&self) -> bool;
     fn is_at_end_of_text(&self) -> bool;
+    fn is_at_word_boundary(&self) -> bool;
     fn byte_position(&self) -> usize;
+    fn peek_next_byte(&self) -> Option<u8>;
+    fn peek_prev_byte(&self) -> Option<u8>;
     fn move_to(&mut self, byte_position: usize);
     fn next_byte(&mut self) -> Option<u8>;
     fn prev_byte(&mut self) -> Option<u8>;
@@ -25,8 +28,20 @@ impl<'a, T: Cursor> Cursor for &'a mut T {
         (**self).is_at_end_of_text()
     }
 
+    fn is_at_word_boundary(&self) -> bool {
+        (**self).is_at_word_boundary()
+    }
+
     fn byte_position(&self) -> usize {
         (**self).byte_position()
+    }
+
+    fn peek_next_byte(&self) -> Option<u8> {
+        (**self).peek_next_byte()
+    }
+
+    fn peek_prev_byte(&self) -> Option<u8> {
+        (**self).peek_prev_byte()
     }
 
     fn move_to(&mut self, position: usize) {
@@ -64,8 +79,20 @@ impl<C: Cursor> Cursor for Rev<C> {
         self.cursor.is_at_start_of_text()
     }
 
+    fn is_at_word_boundary(&self) -> bool {
+        self.cursor.is_at_word_boundary()
+    }
+
     fn byte_position(&self) -> usize {
         self.cursor.byte_position()
+    }
+
+    fn peek_next_byte(&self) -> Option<u8> {
+        self.cursor.peek_prev_byte()
+    }
+
+    fn peek_prev_byte(&self) -> Option<u8> {
+        self.cursor.peek_next_byte()
     }
 
     fn move_to(&mut self, byte_position: usize) {

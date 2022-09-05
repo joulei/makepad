@@ -5,53 +5,293 @@ mod macros;
 
 use crate::macros::test_regex;
 
-test_regex!(nullsubexpr_1, r#"(a*)*"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_2, r#"(a*)*"#, "x", [Some(0), Some(0), None, None]);
-test_regex!(nullsubexpr_3, r#"(a*)*"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_4, r#"(a*)*"#, "aaaaaax", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_5, r#"(a*)+"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_6, r#"(a*)+"#, "x", [Some(0), Some(0), Some(0), Some(0)]);
-test_regex!(nullsubexpr_7, r#"(a*)+"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_8, r#"(a*)+"#, "aaaaaax", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_9, r#"(a+)*"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
+test_regex!(
+    nullsubexpr_1,
+    r#"(a*)*"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_2,
+    r#"(a*)*"#,
+    "x",
+    [Some(0), Some(0), None, None]
+);
+test_regex!(
+    nullsubexpr_3,
+    r#"(a*)*"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_4,
+    r#"(a*)*"#,
+    "aaaaaax",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_5,
+    r#"(a*)+"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_6,
+    r#"(a*)+"#,
+    "x",
+    [Some(0), Some(0), Some(0), Some(0)]
+);
+test_regex!(
+    nullsubexpr_7,
+    r#"(a*)+"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_8,
+    r#"(a*)+"#,
+    "aaaaaax",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_9,
+    r#"(a+)*"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
 test_regex!(nullsubexpr_10, r#"(a+)*"#, "x", [Some(0), Some(0)]);
-test_regex!(nullsubexpr_11, r#"(a+)*"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_12, r#"(a+)*"#, "aaaaaax", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_13, r#"(a+)+"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
+test_regex!(
+    nullsubexpr_11,
+    r#"(a+)*"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_12,
+    r#"(a+)*"#,
+    "aaaaaax",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_13,
+    r#"(a+)+"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
 test_regex!(nullsubexpr_14, r#"(a+)+"#, "x", []);
-test_regex!(nullsubexpr_15, r#"(a+)+"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_16, r#"(a+)+"#, "aaaaaax", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_17, r#"([a]*)*"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_18, r#"([a]*)*"#, "x", [Some(0), Some(0), None, None]);
-test_regex!(nullsubexpr_19, r#"([a]*)*"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_20, r#"([a]*)*"#, "aaaaaax", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_21, r#"([a]*)+"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_22, r#"([a]*)+"#, "x", [Some(0), Some(0), Some(0), Some(0)]);
-test_regex!(nullsubexpr_23, r#"([a]*)+"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_24, r#"([a]*)+"#, "aaaaaax", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_25, r#"([^b]*)*"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_26, r#"([^b]*)*"#, "b", [Some(0), Some(0), None, None]);
-test_regex!(nullsubexpr_27, r#"([^b]*)*"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_28, r#"([^b]*)*"#, "aaaaaab", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_29, r#"([ab]*)*"#, "a", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_30, r#"([ab]*)*"#, "aaaaaa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_31, r#"([ab]*)*"#, "ababab", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_32, r#"([ab]*)*"#, "bababa", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_33, r#"([ab]*)*"#, "b", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_34, r#"([ab]*)*"#, "bbbbbb", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_35, r#"([ab]*)*"#, "aaaabcde", [Some(0), Some(5), Some(0), Some(5)]);
-test_regex!(nullsubexpr_36, r#"([^a]*)*"#, "b", [Some(0), Some(1), Some(0), Some(1)]);
-test_regex!(nullsubexpr_37, r#"([^a]*)*"#, "bbbbbb", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_38, r#"([^a]*)*"#, "aaaaaa", [Some(0), Some(0), None, None]);
-test_regex!(nullsubexpr_39, r#"([^ab]*)*"#, "ccccxx", [Some(0), Some(6), Some(0), Some(6)]);
-test_regex!(nullsubexpr_40, r#"([^ab]*)*"#, "ababab", [Some(0), Some(0), None, None]);
-test_regex!(nullsubexpr_41, r#"((z)+|a)*"#, "zabcde", [Some(0), Some(2), Some(1), Some(2)]);
-test_regex!(nullsubexpr_42, r#"(a*)*(x)"#, "x", [Some(0), Some(1), None, None, Some(0), Some(1)]);
-test_regex!(nullsubexpr_43, r#"(a*)*(x)"#, "ax", [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]);
-test_regex!(nullsubexpr_44, r#"(a*)*(x)"#, "axa", [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]);
-test_regex!(nullsubexpr_45, r#"(a*)+(x)"#, "x", [Some(0), Some(1), Some(0), Some(0), Some(0), Some(1)]);
-test_regex!(nullsubexpr_46, r#"(a*)+(x)"#, "ax", [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]);
-test_regex!(nullsubexpr_47, r#"(a*)+(x)"#, "axa", [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]);
-test_regex!(nullsubexpr_48, r#"(a*){2}(x)"#, "x", [Some(0), Some(1), Some(0), Some(0), Some(0), Some(1)]);
-test_regex!(nullsubexpr_49, r#"(a*){2}(x)"#, "ax", [Some(0), Some(2), Some(1), Some(1), Some(1), Some(2)]);
-test_regex!(nullsubexpr_50, r#"(a*){2}(x)"#, "axa", [Some(0), Some(2), Some(1), Some(1), Some(1), Some(2)]);
+test_regex!(
+    nullsubexpr_15,
+    r#"(a+)+"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_16,
+    r#"(a+)+"#,
+    "aaaaaax",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_17,
+    r#"([a]*)*"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_18,
+    r#"([a]*)*"#,
+    "x",
+    [Some(0), Some(0), None, None]
+);
+test_regex!(
+    nullsubexpr_19,
+    r#"([a]*)*"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_20,
+    r#"([a]*)*"#,
+    "aaaaaax",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_21,
+    r#"([a]*)+"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_22,
+    r#"([a]*)+"#,
+    "x",
+    [Some(0), Some(0), Some(0), Some(0)]
+);
+test_regex!(
+    nullsubexpr_23,
+    r#"([a]*)+"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_24,
+    r#"([a]*)+"#,
+    "aaaaaax",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_25,
+    r#"([^b]*)*"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_26,
+    r#"([^b]*)*"#,
+    "b",
+    [Some(0), Some(0), None, None]
+);
+test_regex!(
+    nullsubexpr_27,
+    r#"([^b]*)*"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_28,
+    r#"([^b]*)*"#,
+    "aaaaaab",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_29,
+    r#"([ab]*)*"#,
+    "a",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_30,
+    r#"([ab]*)*"#,
+    "aaaaaa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_31,
+    r#"([ab]*)*"#,
+    "ababab",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_32,
+    r#"([ab]*)*"#,
+    "bababa",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_33,
+    r#"([ab]*)*"#,
+    "b",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_34,
+    r#"([ab]*)*"#,
+    "bbbbbb",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_35,
+    r#"([ab]*)*"#,
+    "aaaabcde",
+    [Some(0), Some(5), Some(0), Some(5)]
+);
+test_regex!(
+    nullsubexpr_36,
+    r#"([^a]*)*"#,
+    "b",
+    [Some(0), Some(1), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_37,
+    r#"([^a]*)*"#,
+    "bbbbbb",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_38,
+    r#"([^a]*)*"#,
+    "aaaaaa",
+    [Some(0), Some(0), None, None]
+);
+test_regex!(
+    nullsubexpr_39,
+    r#"([^ab]*)*"#,
+    "ccccxx",
+    [Some(0), Some(6), Some(0), Some(6)]
+);
+test_regex!(
+    nullsubexpr_40,
+    r#"([^ab]*)*"#,
+    "ababab",
+    [Some(0), Some(0), None, None]
+);
+test_regex!(
+    nullsubexpr_41,
+    r#"((z)+|a)*"#,
+    "zabcde",
+    [Some(0), Some(2), Some(1), Some(2)]
+);
+test_regex!(
+    nullsubexpr_42,
+    r#"(a*)*(x)"#,
+    "x",
+    [Some(0), Some(1), None, None, Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_43,
+    r#"(a*)*(x)"#,
+    "ax",
+    [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]
+);
+test_regex!(
+    nullsubexpr_44,
+    r#"(a*)*(x)"#,
+    "axa",
+    [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]
+);
+test_regex!(
+    nullsubexpr_45,
+    r#"(a*)+(x)"#,
+    "x",
+    [Some(0), Some(1), Some(0), Some(0), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_46,
+    r#"(a*)+(x)"#,
+    "ax",
+    [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]
+);
+test_regex!(
+    nullsubexpr_47,
+    r#"(a*)+(x)"#,
+    "axa",
+    [Some(0), Some(2), Some(0), Some(1), Some(1), Some(2)]
+);
+test_regex!(
+    nullsubexpr_48,
+    r#"(a*){2}(x)"#,
+    "x",
+    [Some(0), Some(1), Some(0), Some(0), Some(0), Some(1)]
+);
+test_regex!(
+    nullsubexpr_49,
+    r#"(a*){2}(x)"#,
+    "ax",
+    [Some(0), Some(2), Some(1), Some(1), Some(1), Some(2)]
+);
+test_regex!(
+    nullsubexpr_50,
+    r#"(a*){2}(x)"#,
+    "axa",
+    [Some(0), Some(2), Some(1), Some(1), Some(1), Some(2)]
+);

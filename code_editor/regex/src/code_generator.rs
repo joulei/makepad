@@ -128,7 +128,7 @@ impl<'a> CompileContext<'a> {
                     (Some(frag), _) | (_, Some(frag)) => frag,
                     (None, None) => self.generate_empty(),
                 }
-            },
+            }
             Ast::Cat(ref asts) => {
                 let mut asts = asts.iter();
                 let mut acc_frag = self.generate_recursive(asts.next().unwrap());
@@ -159,9 +159,9 @@ impl<'a> CompileContext<'a> {
 
     fn generate_empty(&mut self) -> Frag {
         let instr = self.emit_instr(Instr::Empty(program::NULL_INSTR_PTR));
-        Frag { 
+        Frag {
             start: instr,
-            ends: HolePtrList::unit(HolePtr::next_0(instr))
+            ends: HolePtrList::unit(HolePtr::next_0(instr)),
         }
     }
 
@@ -249,11 +249,15 @@ impl<'a> CompileContext<'a> {
                 match pred {
                     ast::Pred::IsAtStartOfText => program::Pred::IsAtEndOfText,
                     ast::Pred::IsAtEndOfText => program::Pred::IsAtStartOfText,
+                    ast::Pred::IsAtWordBoundary => program::Pred::IsAtWordBoundary,
+                    ast::Pred::IsNotAtWordBoundary => program::Pred::IsNotAtWordBoundary,
                 }
             } else {
                 match pred {
                     ast::Pred::IsAtStartOfText => program::Pred::IsAtStartOfText,
                     ast::Pred::IsAtEndOfText => program::Pred::IsAtEndOfText,
+                    ast::Pred::IsAtWordBoundary => program::Pred::IsAtWordBoundary,
+                    ast::Pred::IsNotAtWordBoundary => program::Pred::IsNotAtWordBoundary,
                 }
             },
             program::NULL_INSTR_PTR,

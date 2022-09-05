@@ -24,8 +24,28 @@ impl<'a> Cursor for StrCursor<'a> {
         self.byte_position == self.string.len()
     }
 
+    fn is_at_word_boundary(&self) -> bool {
+        use crate::CharExt;
+
+        let prev_ch = self.string[..self.byte_position].chars().next_back();
+        let next_ch = self.string[self.byte_position..].chars().next();
+        prev_ch.map_or(false, |ch| ch.is_word()) != next_ch.map_or(false, |ch| ch.is_word())
+    }
+
     fn byte_position(&self) -> usize {
         self.byte_position
+    }
+
+    fn peek_next_byte(&self) -> Option<u8> {
+        self.string.as_bytes()[self.byte_position..]
+            .first()
+            .cloned()
+    }
+
+    fn peek_prev_byte(&self) -> Option<u8> {
+        self.string.as_bytes()[..self.byte_position()]
+            .last()
+            .cloned()
     }
 
     fn move_to(&mut self, position: usize) {
@@ -63,7 +83,10 @@ impl<'a> Cursor for StrCursor<'a> {
         if self.byte_position == 0 {
             return None;
         }
-        let ch = self.string[..self.byte_position].chars().next_back().unwrap();
+        let ch = self.string[..self.byte_position]
+            .chars()
+            .next_back()
+            .unwrap();
         self.byte_position -= ch.len_utf8();
         Some(ch)
     }

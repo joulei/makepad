@@ -3,13 +3,14 @@ use {
         program::{Instr, InstrPtr, Pred},
         Cursor, Program, SparseSet,
     },
-    std::{collections::HashMap, rc::Rc},
+    std::{collections::HashMap, error, fmt, rc::Rc},
 };
 
 const MAX_STATE_PTR: StatePtr = (1 << 30) - 1;
 const MATCHED_FLAG: StatePtr = 1 << 30;
 const UNKNOWN_STATE_PTR: StatePtr = 1 << 31;
 const DEAD_STATE_PTR: StatePtr = (1 << 31) + 1;
+const ERROR_STATE_PTR: StatePtr = (1 << 31) + 2;
 
 #[derive(Clone, Debug)]
 pub struct Dfa {
@@ -40,7 +41,7 @@ impl Dfa {
         program: &Program,
         cursor: C,
         options: Options,
-    ) -> Option<usize> {
+    ) -> Result<Option<usize>, RunError> {
         if !self.current_threads.instrs.capacity() != program.instrs.len() {
             self.current_threads = Threads::new(program.instrs.len());
             self.next_threads = Threads::new(program.instrs.len());
@@ -65,6 +66,17 @@ pub(crate) struct Options {
     pub(crate) continue_until_last_match: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct RunError;
+
+impl fmt::Display for RunError {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl error::Error for RunError {}
+
 struct RunContext<'a, C> {
     start_state_cache: &'a mut [StatePtr],
     states: &'a mut States,
@@ -77,14 +89,16 @@ struct RunContext<'a, C> {
 }
 
 impl<'a, C: Cursor> RunContext<'a, C> {
-    fn run(&mut self) -> Option<usize> {
+    fn run(&mut self) -> Result<Option<usize>, RunError> {
         let mut matched = None;
         let mut current_state = UNKNOWN_STATE_PTR;
         let mut next_state = self.get_or_create_start_state();
         while !self.cursor.is_at_end_of_text() {
             while next_state <= MAX_STATE_PTR && !self.cursor.is_at_end_of_text() {
                 current_state = next_state;
-                next_state = *self.states.next_state(current_state, self.cursor.next_byte());
+                next_state = *self
+                    .states
+                    .next_state(current_state, self.cursor.next_byte());
             }
             if next_state == UNKNOWN_STATE_PTR {
                 let byte = Some(self.cursor.prev_byte().unwrap());
@@ -97,11 +111,13 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 matched = Some(self.cursor.byte_position());
                 self.cursor.next_byte().unwrap();
                 if self.options.stop_after_first_match {
-                    return matched;
+                    return Ok(matched);
                 }
                 next_state &= !MATCHED_FLAG;
             } else if next_state == DEAD_STATE_PTR {
-                return matched;
+                return Ok(matched);
+            } else if next_state == ERROR_STATE_PTR {
+                return Err(RunError);
             }
         }
         next_state &= MAX_STATE_PTR;
@@ -110,13 +126,24 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         if next_state & MATCHED_FLAG != 0 {
             matched = Some(self.cursor.byte_position());
         }
-        matched
+        Ok(matched)
     }
 
     fn get_or_create_start_state(&mut self) -> StatePtr {
+        use crate::CharExt;
+
+        let prev_byte_is_ascii_word = self
+            .cursor
+            .peek_prev_byte()
+            .map_or(false, |b| (b as char).is_ascii_word());
+        let next_byte_is_ascii_word = self
+            .cursor
+            .peek_next_byte()
+            .map_or(false, |b| (b as char).is_ascii_word());
         let preds = Preds {
             is_at_start_of_text: self.cursor.is_at_start_of_text(),
             is_at_end_of_text: self.cursor.is_at_end_of_text(),
+            is_at_ascii_word_boundary: prev_byte_is_ascii_word != next_byte_is_ascii_word,
         };
         let bits = preds.to_bits() as usize;
         match self.start_state_cache[bits] {
@@ -140,16 +167,24 @@ impl<'a, C: Cursor> RunContext<'a, C> {
     }
 
     fn get_or_create_next_state(&mut self, state: StatePtr, byte: Option<u8>) -> StatePtr {
-        use std::mem;
+        use {crate::CharExt, std::mem};
 
         let state_id = &self.states.state_ids[state as usize];
         for instr in state_id.instrs() {
             self.current_threads.instrs.insert(instr);
         }
         let mut flags = Flags::default();
-        if state_id.flags.assert() {
+        let next_byte_is_ascii_word = byte.map_or(false, |byte| (byte as char).is_ascii_word());
+        if next_byte_is_ascii_word {
+            flags.set_prev_byte_is_ascii_word();
+        }
+        if state_id.flags.contains_assert_instr() {
+            let prev_byte_is_ascii_word = self.states.state_ids[state as usize]
+                .flags
+                .prev_byte_is_ascii_word();
             let preds = Preds {
                 is_at_end_of_text: byte.is_none(),
+                is_at_ascii_word_boundary: prev_byte_is_ascii_word != next_byte_is_ascii_word,
                 ..Preds::default()
             };
             for &instr in &self.current_threads.instrs {
@@ -278,12 +313,20 @@ impl Flags {
         self.0 |= 1 << 0
     }
 
-    fn assert(&self) -> bool {
+    fn contains_assert_instr(&self) -> bool {
         self.0 & 1 << 1 != 0
     }
 
-    fn set_assert(&mut self) {
+    fn set_contains_assert_instr(&mut self) {
         self.0 |= 1 << 1
+    }
+
+    fn prev_byte_is_ascii_word(&self) -> bool {
+        self.0 & 1 << 2 != 0
+    }
+
+    fn set_prev_byte_is_ascii_word(&mut self) {
+        self.0 |= 1 << 2;
     }
 }
 
@@ -340,10 +383,12 @@ impl Threads {
                         if match pred {
                             Pred::IsAtStartOfText => preds.is_at_start_of_text,
                             Pred::IsAtEndOfText => preds.is_at_end_of_text,
+                            Pred::IsAtWordBoundary => preds.is_at_ascii_word_boundary,
+                            Pred::IsNotAtWordBoundary => !preds.is_at_ascii_word_boundary,
                         } {
                             instr = next;
                         } else {
-                            flags.set_assert();
+                            flags.set_contains_assert_instr();
                         }
                     }
                     Instr::Split(next_0, next_1) => {
@@ -361,6 +406,7 @@ impl Threads {
 struct Preds {
     is_at_start_of_text: bool,
     is_at_end_of_text: bool,
+    is_at_ascii_word_boundary: bool,
 }
 
 impl Preds {

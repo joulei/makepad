@@ -16,6 +16,8 @@ pub(crate) enum Ast {
 pub(crate) enum Pred {
     IsAtStartOfText,
     IsAtEndOfText,
+    IsAtWordBoundary,
+    IsNotAtWordBoundary,
 }
 
 #[derive(Clone, Copy, Debug)]

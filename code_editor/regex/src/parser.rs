@@ -96,18 +96,19 @@ impl<'a> ParseContext<'a> {
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Plus(non_greedy)));
                 }
-                Some('{') => {
-                    match self.try_parse_counted() {
-                        Some((min, max, non_greedy)) => {
-                            let ast = self.asts.pop().ok_or(ParseError)?;
-                            self.asts.push(Ast::Rep(Box::new(ast), Quant::Counted(min, max, non_greedy)));
-                        }
-                        None => {
-                            self.skip_char();
-                            self.push_char('{');
-                        }
+                Some('{') => match self.try_parse_counted() {
+                    Some((min, max, non_greedy)) => {
+                        let ast = self.asts.pop().ok_or(ParseError)?;
+                        self.asts.push(Ast::Rep(
+                            Box::new(ast),
+                            Quant::Counted(min, max, non_greedy),
+                        ));
                     }
-                }
+                    None => {
+                        self.skip_char();
+                        self.push_char('{');
+                    }
+                },
                 Some('^') => {
                     self.skip_char();
                     self.maybe_push_cat();
@@ -128,7 +129,7 @@ impl<'a> ParseContext<'a> {
                             self.skip_two_chars();
                             non_capturing = true;
                         }
-                        _ => {},
+                        _ => {}
                     };
                     self.push_group(non_capturing, Flags::default());
                 }
@@ -148,19 +149,17 @@ impl<'a> ParseContext<'a> {
                     self.asts.push(Ast::CharClass(CharClass::any()));
                     self.group.ast_count += 1;
                 }
-                Some('\\') => {
-                    match self.try_parse_escaped_char_class() {
-                        Some(char_class) => {
-                            self.maybe_push_cat();
-                            self.asts.push(Ast::CharClass(char_class));
-                            self.group.ast_count += 1;
-                        }
-                        None => {
-                            let ch = self.parse_escaped_char()?;
-                            self.push_char(ch);
-                        }
+                Some('\\') => match self.try_parse_escaped_char_class() {
+                    Some(char_class) => {
+                        self.maybe_push_cat();
+                        self.asts.push(Ast::CharClass(char_class));
+                        self.group.ast_count += 1;
                     }
-                }
+                    None => {
+                        let ch = self.parse_escaped_char()?;
+                        self.push_char(ch);
+                    }
+                },
                 Some(ch) => {
                     self.skip_char();
                     self.push_char(ch);
@@ -180,7 +179,7 @@ impl<'a> ParseContext<'a> {
             Some(min) => min,
             None => {
                 self.byte_position = byte_position;
-                return None
+                return None;
             }
         };
         let max = if self.peek_char() == Some(',') {
@@ -366,7 +365,6 @@ impl<'a> ParseContext<'a> {
     fn peek_two_chars(&self) -> (Option<char>, Option<char>) {
         let mut chars = self.pattern[self.byte_position..].chars();
         (chars.next(), chars.next())
-
     }
 
     fn skip_char(&mut self) {

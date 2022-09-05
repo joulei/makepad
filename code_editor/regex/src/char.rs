@@ -13,7 +13,7 @@ impl CharExt for char {
 
     fn is_word(self) -> bool {
         use crate::posix_char_classes;
-        
+
         if self.is_ascii() && self.is_ascii_word() {
             return true;
         }

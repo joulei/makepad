@@ -1,6 +1,9 @@
 use {
-    crate::{code_generator, dfa, parser, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
-    std::{cell::RefCell, fmt, error, result::Result, sync::Arc},
+    crate::{
+        code_generator, dfa, nfa, parser, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program,
+        StrCursor,
+    },
+    std::{cell::RefCell, error, fmt, result::Result, sync::Arc},
 };
 
 #[derive(Clone, Debug)]
@@ -51,7 +54,7 @@ impl Regex {
 
     pub fn run_with_cursor<C: Cursor>(&self, mut cursor: C, slots: &mut [Option<usize>]) -> bool {
         let mut unique = self.unique.borrow_mut();
-        let end = match unique.dfa.run(
+        match unique.dfa.run(
             &self.shared.dfa_program,
             &mut cursor,
             dfa::Options {
@@ -59,35 +62,54 @@ impl Regex {
                 ..dfa::Options::default()
             },
         ) {
-            Some(end) => end,
-            None => return false,
-        };
-        cursor.move_to(end);
-        let start = unique
-            .reverse_dfa
-            .run(
-                &self.shared.reverse_dfa_program,
-                (&mut cursor).rev(),
-                dfa::Options {
-                    continue_until_last_match: true,
-                    ..dfa::Options::default()
-                },
-            )
-            .unwrap();
-        cursor.move_to(start);
-        if slots.len() == 2 {
-            slots[0] = Some(start);
-            slots[1] = Some(end);
-        } else {
-            unique.nfa.run(&self.shared.nfa_program, cursor, slots);
+            Ok(Some(end)) => {
+                cursor.move_to(end);
+                match unique.reverse_dfa.run(
+                    &self.shared.reverse_dfa_program,
+                    (&mut cursor).rev(),
+                    dfa::Options {
+                        continue_until_last_match: true,
+                        ..dfa::Options::default()
+                    },
+                ) {
+                    Ok(Some(start)) => {
+                        cursor.move_to(start);
+                        if slots.len() == 2 {
+                            slots[0] = Some(start);
+                            slots[1] = Some(end);
+                        } else {
+                            unique.nfa.run(
+                                &self.shared.nfa_program,
+                                cursor,
+                                nfa::Options::default(),
+                                slots,
+                            );
+                        }
+                        return true;
+                    }
+                    Ok(None) => panic!(),
+                    Err(_) => {}
+                }
+            }
+            Ok(None) => return false,
+            Err(_) => {}
         }
-        true
+        let mut unique = self.unique.borrow_mut();
+        unique.nfa.run(
+            &self.shared.nfa_program,
+            cursor,
+            nfa::Options {
+                stop_after_first_match: slots.is_empty(),
+                ..nfa::Options::default()
+            },
+            slots,
+        )
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum Error {
-    Parse
+    Parse,
 }
 
 impl fmt::Display for Error {
