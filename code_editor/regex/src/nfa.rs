@@ -124,7 +124,7 @@ impl Threads {
                         break;
                     }
                     match instrs[instr] {
-                        Instr::Nop(next) => {
+                        Instr::Empty(next) => {
                             instr = next;
                         }
                         Instr::Save(slot_index, next) => {

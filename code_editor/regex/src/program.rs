@@ -27,10 +27,10 @@ impl fmt::Debug for Program {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Instr {
     Match,
+    Empty(InstrPtr),
     ByteRange(Range<u8>, InstrPtr),
     Char(char, InstrPtr),
     CharClass(CharClass, InstrPtr),
-    Nop(InstrPtr),
     Save(usize, InstrPtr),
     Assert(Pred, InstrPtr),
     Split(InstrPtr, InstrPtr),
@@ -39,10 +39,10 @@ pub(crate) enum Instr {
 impl Instr {
     pub fn next_0(&self) -> &InstrPtr {
         match self {
+            Self::Empty(next_0) => next_0,
             Self::ByteRange(_, next_0) => next_0,
             Self::Char(_, next_0) => next_0,
             Self::CharClass(_, next_0) => next_0,
-            Self::Nop(next_0) => next_0,
             Self::Save(_, next_0) => next_0,
             Self::Assert(_, next_0) => next_0,
             Self::Split(next_0, _) => next_0,
@@ -59,10 +59,10 @@ impl Instr {
 
     pub fn next_0_mut(&mut self) -> &mut InstrPtr {
         match self {
+            Self::Empty(next_0) => next_0,
             Self::ByteRange(_, next_0) => next_0,
             Self::Char(_, next_0) => next_0,
             Self::CharClass(_, next_0) => next_0,
-            Self::Nop(next_0) => next_0,
             Self::Save(_, next_0) => next_0,
             Self::Assert(_, next_0) => next_0,
             Self::Split(next_0, _) => next_0,

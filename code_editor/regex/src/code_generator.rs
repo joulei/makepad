@@ -72,6 +72,7 @@ impl<'a> CompileContext<'a> {
 
     fn generate_recursive(&mut self, ast: &Ast) -> Frag {
         match *ast {
+            Ast::Empty => self.generate_empty(),
             Ast::Char(ch) => self.generate_char(ch),
             Ast::CharClass(ref char_class) => self.generate_char_class(char_class),
             Ast::Capture(ref ast, index) => {
@@ -153,6 +154,14 @@ impl<'a> CompileContext<'a> {
         Frag {
             start: self.emit_instr(Instr::Match),
             ends: HolePtrList::new(),
+        }
+    }
+
+    fn generate_empty(&mut self) -> Frag {
+        let instr = self.emit_instr(Instr::Empty(program::NULL_INSTR_PTR));
+        Frag { 
+            start: instr,
+            ends: HolePtrList::unit(HolePtr::next_0(instr))
         }
     }
 
@@ -325,14 +334,6 @@ impl<'a> CompileContext<'a> {
         }
     }
 
-    fn generate_empty(&mut self) -> Frag {
-        let instr = self.emit_instr(Instr::Nop(program::NULL_INSTR_PTR));
-        Frag { 
-            start: instr,
-            ends: HolePtrList::unit(HolePtr::next_0(instr))
-        }
-    }
-
     fn emit_instr(&mut self, instr: Instr) -> InstrPtr {
         let instr_ptr = self.instrs.len();
         self.instrs.push(instr);
@@ -355,7 +356,7 @@ impl<'a> SuffixTree<'a> {
         if start == program::NULL_INSTR_PTR {
             let instr = self
                 .suffix_cache
-                .emit_instr(Instr::Nop(program::NULL_INSTR_PTR));
+                .emit_instr(Instr::Empty(program::NULL_INSTR_PTR));
             Frag {
                 start: instr,
                 ends: HolePtrList::unit(HolePtr::next_0(instr)),

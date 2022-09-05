@@ -3,7 +3,7 @@ use {
         ast::{Pred, Quant},
         Ast, CaseFolder, CharClass, Range,
     },
-    std::{error, fmt, result},
+    std::{error, fmt},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -19,7 +19,7 @@ impl Parser {
         Self::default()
     }
 
-    pub(crate) fn parse(&mut self, pattern: &str) -> Result<Ast> {
+    pub(crate) fn parse(&mut self, pattern: &str) -> Result<Ast, ParseError> {
         ParseContext {
             asts: &mut self.asts,
             groups: &mut self.groups,
@@ -47,7 +47,7 @@ struct ParseContext<'a> {
 }
 
 impl<'a> ParseContext<'a> {
-    fn parse(&mut self) -> Result<Ast> {
+    fn parse(&mut self) -> Result<Ast, ParseError> {
         loop {
             match self.peek_char() {
                 Some('|') => {
@@ -55,7 +55,7 @@ impl<'a> ParseContext<'a> {
                     self.maybe_push_cat();
                     self.pop_cats();
                     if self.asts.is_empty() {
-                        return Err(Error);
+                        return Err(ParseError);
                     }
                     self.group.alt_count += 1;
                 }
@@ -66,7 +66,7 @@ impl<'a> ParseContext<'a> {
                         self.skip_char();
                         non_greedy = true;
                     }
-                    let ast = self.asts.pop().ok_or(Error)?;
+                    let ast = self.asts.pop().ok_or(ParseError)?;
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Quest(non_greedy)));
                 }
@@ -92,14 +92,14 @@ impl<'a> ParseContext<'a> {
                         self.skip_char();
                         non_greedy = true;
                     }
-                    let ast = self.asts.pop().ok_or(Error)?;
+                    let ast = self.asts.pop().ok_or(ParseError)?;
                     self.asts
                         .push(Ast::Rep(Box::new(ast), Quant::Plus(non_greedy)));
                 }
                 Some('{') => {
                     match self.try_parse_counted() {
                         Some((min, max, non_greedy)) => {
-                            let ast = self.asts.pop().ok_or(Error)?;
+                            let ast = self.asts.pop().ok_or(ParseError)?;
                             self.asts.push(Ast::Rep(Box::new(ast), Quant::Counted(min, max, non_greedy)));
                         }
                         None => {
@@ -134,7 +134,7 @@ impl<'a> ParseContext<'a> {
                 }
                 Some(')') => {
                     self.skip_char();
-                    self.pop_group();
+                    self.pop_group()?;
                 }
                 Some('[') => {
                     let char_class = self.parse_char_class()?;
@@ -170,7 +170,7 @@ impl<'a> ParseContext<'a> {
         }
         self.maybe_push_cat();
         self.pop_alts();
-        self.asts.pop().ok_or(Error)
+        Ok(self.asts.pop().unwrap_or(Ast::Empty))
     }
 
     fn try_parse_counted(&mut self) -> Option<(u32, Option<u32>, bool)> {
@@ -212,7 +212,7 @@ impl<'a> ParseContext<'a> {
         Some((min, max, non_greedy))
     }
 
-    fn parse_char_class(&mut self) -> Result<CharClass> {
+    fn parse_char_class(&mut self) -> Result<CharClass, ParseError> {
         use std::mem;
 
         let mut char_class = CharClass::new();
@@ -254,7 +254,7 @@ impl<'a> ParseContext<'a> {
         Ok(char_class)
     }
 
-    fn parse_posix_char_class(&mut self) -> Result<CharClass> {
+    fn parse_posix_char_class(&mut self) -> Result<CharClass, ParseError> {
         use {crate::posix_char_classes::*, std::mem};
 
         self.skip_two_chars();
@@ -273,7 +273,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 (Some(_), _) => self.skip_char(),
-                (None, _) => return Err(Error),
+                (None, _) => return Err(ParseError),
             }
         }
         let mut char_class = CharClass::from_sorted_iter(
@@ -291,7 +291,7 @@ impl<'a> ParseContext<'a> {
                 "upper" => UPPER.as_slice(),
                 "word" => WORD.as_slice(),
                 "xdigit" => XDIGIT.as_slice(),
-                _ => return Err(Error),
+                _ => return Err(ParseError),
             }
             .iter()
             .cloned(),
@@ -304,7 +304,7 @@ impl<'a> ParseContext<'a> {
         Ok(char_class)
     }
 
-    fn parse_char_range(&mut self) -> Result<Range<char>> {
+    fn parse_char_range(&mut self) -> Result<Range<char>, ParseError> {
         let start = self.parse_char()?;
         Ok(match self.peek_two_chars() {
             (Some('-'), ch) if ch != Some(']') => {
@@ -316,8 +316,8 @@ impl<'a> ParseContext<'a> {
         })
     }
 
-    fn parse_char(&mut self) -> Result<char> {
-        let ch = self.peek_char().ok_or(Error)?;
+    fn parse_char(&mut self) -> Result<char, ParseError> {
+        let ch = self.peek_char().ok_or(ParseError)?;
         self.skip_char();
         Ok(ch)
     }
@@ -326,7 +326,7 @@ impl<'a> ParseContext<'a> {
         None
     }
 
-    fn parse_escaped_char(&mut self) -> Result<char> {
+    fn parse_escaped_char(&mut self) -> Result<char, ParseError> {
         use crate::char::CharExt;
 
         self.skip_char();
@@ -335,16 +335,16 @@ impl<'a> ParseContext<'a> {
             Some('r') => '\r',
             Some('t') => '\t',
             Some(c) if !c.is_word() => c,
-            _ => return Err(Error),
+            _ => return Err(ParseError),
         };
         self.skip_char();
         Ok(c)
     }
 
-    fn parse_dec_int(&mut self) -> Result<u32> {
+    fn parse_dec_int(&mut self) -> Result<u32, ParseError> {
         let ch = match self.peek_char() {
             Some(ch) if ch.is_digit(10) => ch,
-            _ => return Err(Error),
+            _ => return Err(ParseError),
         };
         self.skip_char();
         let mut value = ch.to_digit(10).unwrap();
@@ -354,7 +354,7 @@ impl<'a> ParseContext<'a> {
                 _ => break,
             };
             self.skip_char();
-            value = value.checked_mul(10).ok_or(Error)? + ch.to_digit(10).unwrap();
+            value = value.checked_mul(10).ok_or(ParseError)? + ch.to_digit(10).unwrap();
         }
         Ok(value)
     }
@@ -394,15 +394,16 @@ impl<'a> ParseContext<'a> {
         self.groups.push(group);
     }
 
-    fn pop_group(&mut self) {
+    fn pop_group(&mut self) -> Result<(), ParseError> {
         self.maybe_push_cat();
         self.pop_alts();
         if let Some(cap_index) = self.group.cap_index {
-            let ast = self.asts.pop().unwrap();
+            let ast = self.asts.pop().unwrap_or(Ast::Empty);
             self.asts.push(Ast::Capture(Box::new(ast), cap_index));
         }
-        self.group = self.groups.pop().unwrap();
+        self.group = self.groups.pop().ok_or(ParseError)?;
         self.group.ast_count += 1;
+        Ok(())
     }
 
     fn push_char(&mut self, ch: char) {
@@ -449,18 +450,16 @@ impl<'a> ParseContext<'a> {
     }
 }
 
-pub type Result<T> = result::Result<T, Error>;
-
 #[derive(Clone, Debug)]
-pub struct Error;
+pub struct ParseError;
 
-impl error::Error for Error {}
-
-impl fmt::Display for Error {
+impl fmt::Display for ParseError {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Ok(())
     }
 }
+
+impl error::Error for ParseError {}
 
 #[derive(Clone, Copy, Debug)]
 struct Group {

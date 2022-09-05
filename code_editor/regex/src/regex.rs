@@ -1,6 +1,6 @@
 use {
-    crate::{code_generator, dfa, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
-    std::{cell::RefCell, sync::Arc},
+    crate::{code_generator, dfa, parser, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
+    std::{cell::RefCell, fmt, error, result::Result, sync::Arc},
 };
 
 #[derive(Clone, Debug)]
@@ -10,9 +10,9 @@ pub struct Regex {
 }
 
 impl Regex {
-    pub fn new(pattern: &str) -> Self {
+    pub fn new(pattern: &str) -> Result<Self, Error> {
         let mut parser = Parser::new();
-        let ast = parser.parse(pattern).unwrap();
+        let ast = parser.parse(pattern)?;
         let mut code_generator = CodeGenerator::new();
         let dfa_program = code_generator.generate(
             &ast,
@@ -31,8 +31,7 @@ impl Regex {
             },
         );
         let nfa_program = code_generator.generate(&ast, code_generator::Options::default());
-        println!("NFA PROGRAM {:?}", nfa_program);
-        Self {
+        Ok(Self {
             unique: Box::new(RefCell::new(Unique {
                 dfa: Dfa::new(),
                 reverse_dfa: Dfa::new(),
@@ -43,7 +42,7 @@ impl Regex {
                 reverse_dfa_program,
                 nfa_program,
             }),
-        }
+        })
     }
 
     pub fn run(&self, haystack: &str, slots: &mut [Option<usize>]) -> bool {
@@ -83,6 +82,25 @@ impl Regex {
             unique.nfa.run(&self.shared.nfa_program, cursor, slots);
         }
         true
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Error {
+    Parse
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl error::Error for Error {}
+
+impl From<parser::ParseError> for Error {
+    fn from(_error: parser::ParseError) -> Self {
+        Error::Parse
     }
 }
 

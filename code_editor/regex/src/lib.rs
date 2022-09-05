@@ -30,9 +30,9 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new("a]");
+        let regex = Regex::new(")").unwrap();
         let mut slots = [None; 2];
-        println!("{:?}", regex.run("a]a", &mut slots));
+        println!("{:?}", regex.run("aba", &mut slots));
         println!("{:?}", slots);
     }
 }

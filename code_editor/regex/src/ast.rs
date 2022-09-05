@@ -2,6 +2,7 @@ use crate::CharClass;
 
 #[derive(Clone, Debug)]
 pub(crate) enum Ast {
+    Empty,
     Char(char),
     CharClass(CharClass),
     Capture(Box<Ast>, usize),

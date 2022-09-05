@@ -335,7 +335,7 @@ impl Threads {
                     break;
                 }
                 match instrs[instr] {
-                    Instr::Nop(next) | Instr::Save(_, next) => instr = next,
+                    Instr::Empty(next) | Instr::Save(_, next) => instr = next,
                     Instr::Assert(pred, next) => {
                         if match pred {
                             Pred::IsAtStartOfText => preds.is_at_start_of_text,
