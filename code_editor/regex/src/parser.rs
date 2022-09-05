@@ -169,7 +169,7 @@ impl<'a> ParseContext<'a> {
             }
         }
         self.maybe_push_cat();
-        self.pop_alts();
+        self.pop_alts()?;
         Ok(self.asts.pop().unwrap_or(Ast::Empty))
     }
 
@@ -396,11 +396,16 @@ impl<'a> ParseContext<'a> {
 
     fn pop_group(&mut self) -> Result<(), ParseError> {
         self.maybe_push_cat();
-        self.pop_alts();
+        self.pop_alts()?;
+        let mut ast = if self.group.ast_count == 0 {
+            Ast::Empty
+        } else {
+            self.asts.pop().unwrap()
+        };
         if let Some(cap_index) = self.group.cap_index {
-            let ast = self.asts.pop().unwrap_or(Ast::Empty);
-            self.asts.push(Ast::Capture(Box::new(ast), cap_index));
+            ast = Ast::Capture(Box::new(ast), cap_index);
         }
+        self.asts.push(ast);
         self.group = self.groups.pop().ok_or(ParseError)?;
         self.group.ast_count += 1;
         Ok(())
@@ -419,15 +424,18 @@ impl<'a> ParseContext<'a> {
     }
 
     fn maybe_push_cat(&mut self) {
-        if self.group.ast_count - self.group.alt_count - self.group.cat_count == 2 {
+        if self.group.ast_count == self.group.alt_count + self.group.cat_count + 2 {
             self.group.cat_count += 1;
         }
     }
 
-    fn pop_alts(&mut self) {
+    fn pop_alts(&mut self) -> Result<(), ParseError> {
         self.pop_cats();
         if self.group.alt_count == 0 {
-            return;
+            return Ok(());
+        }
+        if self.group.ast_count < self.group.alt_count + 1 {
+            return Err(ParseError);
         }
         let asts = self
             .asts
@@ -435,6 +443,7 @@ impl<'a> ParseContext<'a> {
         self.asts.push(Ast::Alt(asts));
         self.group.ast_count -= self.group.alt_count;
         self.group.alt_count = 0;
+        Ok(())
     }
 
     fn pop_cats(&mut self) {

@@ -4,7 +4,7 @@ macro_rules! test_regex {
         fn $name() {
             use makepad_regex::Regex;
 
-            let regex = Regex::new($pattern);
+            let regex = Regex::new($pattern).unwrap();
             let haystack = $haystack;
             let expected: Vec<Option<usize>> = vec![$($expected),*];
             let mut actual = vec![None; expected.len()];

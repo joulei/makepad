@@ -30,9 +30,9 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new(")").unwrap();
+        let regex = Regex::new("*********99{{00**{9999999998{{9999999{9999992,939}99{{00**{99999999999t{;9*9d").unwrap();
         let mut slots = [None; 2];
-        println!("{:?}", regex.run("aba", &mut slots));
+        println!("{:?}", regex.run("f", &mut slots));
         println!("{:?}", slots);
     }
 }
