@@ -51,7 +51,8 @@ impl Nfa {
             for &instr in &self.current_threads.instrs {
                 match program.instrs[instr] {
                     Instr::Match => {
-                        slots.copy_from_slice(self.current_threads.slots.get(instr));
+                        let len = slots.len().min(self.current_threads.slots.get(instr).len());
+                        slots[..len].copy_from_slice(&self.current_threads.slots.get(instr)[..len]);
                         matched = true;
                         break;
                     }
@@ -127,8 +128,10 @@ impl Threads {
                             instr = next;
                         }
                         Instr::Save(slot_index, next) => {
-                            stack.push(Frame::RestoreSlot(slot_index, slots[slot_index]));
-                            slots[slot_index] = Some(cursor.byte_position());
+                            if slot_index < slots.len() {
+                                stack.push(Frame::RestoreSlot(slot_index, slots[slot_index]));
+                                slots[slot_index] = Some(cursor.byte_position());
+                            }
                             instr = next;
                         }
                         Instr::Assert(pred, next) => {
@@ -144,7 +147,8 @@ impl Threads {
                             instr = next_0;
                         }
                         _ => {
-                            self.slots.get_mut(instr).copy_from_slice(slots);
+                            let len = self.slots.get(instr).len().min(slots.len());
+                            self.slots.get_mut(instr)[..len].copy_from_slice(&slots[..len]);
                             break;
                         }
                     }

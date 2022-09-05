@@ -19,7 +19,7 @@ def read_test_data(filename):
         if pattern == "SAME":
             pattern = prev_pattern
         prev_pattern = pattern
-        if "E" not in flags:
+        if "E" not in flags or "i" in flags:
             continue
         haystack = "" if haystack == "NULL" else haystack
         haystack = re.sub(r"\\(?![nx])", r"\\\\", haystack)

@@ -94,7 +94,7 @@ impl<'a> CompileContext<'a> {
             Ast::Rep(ref ast, Quant::Counted(min, max, non_greedy)) => {
                 let frag_0 = if min > 0 {
                     let mut acc_frag = self.generate_recursive(ast);
-                    for _ in 0..min {
+                    for _ in 1..min {
                         let frag = self.generate_recursive(ast);
                         acc_frag = self.generate_cat(acc_frag, frag);
                     }
@@ -107,7 +107,7 @@ impl<'a> CompileContext<'a> {
                         if min < max {
                             let frag = self.generate_recursive(ast);
                             let mut acc_frag = self.generate_quest(frag, non_greedy);
-                            for _ in min..max {
+                            for _ in min + 1..max {
                                 let frag = self.generate_recursive(ast);
                                 let frag = self.generate_cat(frag, acc_frag);
                                 acc_frag = self.generate_quest(frag, non_greedy);

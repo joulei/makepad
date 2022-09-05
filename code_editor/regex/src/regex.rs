@@ -1,6 +1,6 @@
 use {
     crate::{code_generator, dfa, CodeGenerator, Cursor, Dfa, Nfa, Parser, Program, StrCursor},
-    std::{cell::RefCell, ops::Range, sync::Arc},
+    std::{cell::RefCell, sync::Arc},
 };
 
 #[derive(Clone, Debug)]
@@ -31,6 +31,7 @@ impl Regex {
             },
         );
         let nfa_program = code_generator.generate(&ast, code_generator::Options::default());
+        println!("NFA PROGRAM {:?}", nfa_program);
         Self {
             unique: Box::new(RefCell::new(Unique {
                 dfa: Dfa::new(),
