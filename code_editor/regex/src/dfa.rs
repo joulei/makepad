@@ -187,7 +187,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         if next_byte_is_ascii_word {
             flags.set_prev_byte_is_ascii_word();
         }
-        if state_id.flags.contains_assert_instr() {
+        if state_id.flags.contains_assert() {
             let prev_byte_is_ascii_word = self.state_id(*state)
                 .flags
                 .prev_byte_is_ascii_word();
@@ -282,11 +282,16 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         *self.cache_size += mem::size_of::<StateId>()
             + state_id.bytes.len()    
             + self.program.byte_classes.len() as usize * mem::size_of::<StatePtr>();
-        let state_ptr = self.next_states.len() as StatePtr;        
+        let state_ptr = self.next_states.len() as StatePtr;    
         self.state_ids.push(state_id);
         self.next_states
             .extend(iter::repeat(UNKNOWN_STATE_PTR).take(self.program.byte_classes.len() as usize));
-
+        if self.program.contains_non_ascii_assert {
+            for byte in 128..=255 {
+                let byte_class = self.program.byte_classes.get(byte);
+                *self.next_state_mut(state_ptr, byte_class) = ERROR_STATE_PTR;
+            }
+        }
         state_ptr
     }
 
@@ -346,11 +351,11 @@ impl Flags {
         self.0 |= 1 << 0
     }
 
-    fn contains_assert_instr(&self) -> bool {
+    fn contains_assert(&self) -> bool {
         self.0 & 1 << 1 != 0
     }
 
-    fn set_contains_assert_instr(&mut self) {
+    fn set_contains_assert(&mut self) {
         self.0 |= 1 << 1
     }
 
@@ -421,7 +426,7 @@ impl Threads {
                         } {
                             instr = next;
                         } else {
-                            flags.set_contains_assert_instr();
+                            flags.set_contains_assert();
                         }
                     }
                     Instr::Split(next_0, next_1) => {

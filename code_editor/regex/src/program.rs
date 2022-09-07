@@ -7,6 +7,7 @@ pub(crate) const NULL_INSTR_PTR: InstrPtr = usize::MAX;
 
 #[derive(Clone)]
 pub(crate) struct Program {
+    pub(crate) contains_non_ascii_assert: bool,
     pub(crate) slot_count: usize,
     pub(crate) instrs: Vec<Instr>,
     pub(crate) start: usize,
@@ -88,4 +89,14 @@ pub(crate) enum Pred {
     IsAtEndOfText,
     IsAtWordBoundary,
     IsNotAtWordBoundary,
+}
+
+impl Pred {
+    pub(crate) fn reverse(self) -> Self {
+        match self {
+            Pred::IsAtStartOfText => Pred::IsAtEndOfText,
+            Pred::IsAtEndOfText => Pred::IsAtStartOfText,
+            pred => pred,
+        }
+    }
 }

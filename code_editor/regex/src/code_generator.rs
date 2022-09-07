@@ -27,6 +27,7 @@ impl CodeGenerator {
             suffix_nodes: &mut self.suffix_nodes,
             instr_cache: &mut self.instr_cache,
             options,
+            contains_non_ascii_assert: false,
             slot_count: 0,
             emitter: Emitter { instrs: Vec::new() },
             byte_classes: byte_class_set::Builder::new(),
@@ -48,6 +49,7 @@ struct CompileContext<'a> {
     suffix_nodes: &'a mut Vec<SuffixNode>,
     instr_cache: &'a mut HashMap<Instr, InstrPtr>,
     options: Options,
+    contains_non_ascii_assert: bool,
     slot_count: usize,
     emitter: Emitter,
     byte_classes: byte_class_set::Builder,
@@ -66,6 +68,7 @@ impl<'a> CompileContext<'a> {
             frag = self.generate_cat(dot_star_frag, frag);
         }
         Program {
+            contains_non_ascii_assert: self.contains_non_ascii_assert,
             slot_count: self.slot_count,
             instrs: self.emitter.instrs,
             start: frag.start,
@@ -249,24 +252,23 @@ impl<'a> CompileContext<'a> {
     }
 
     fn generate_assert(&mut self, pred: ast::Pred) -> Frag {
-        let instr = self.emit_instr(Instr::Assert(
-            if self.options.reverse {
-                match pred {
-                    ast::Pred::IsAtStartOfText => program::Pred::IsAtEndOfText,
-                    ast::Pred::IsAtEndOfText => program::Pred::IsAtStartOfText,
-                    ast::Pred::IsAtWordBoundary => program::Pred::IsAtWordBoundary,
-                    ast::Pred::IsNotAtWordBoundary => program::Pred::IsNotAtWordBoundary,
-                }
-            } else {
-                match pred {
-                    ast::Pred::IsAtStartOfText => program::Pred::IsAtStartOfText,
-                    ast::Pred::IsAtEndOfText => program::Pred::IsAtEndOfText,
-                    ast::Pred::IsAtWordBoundary => program::Pred::IsAtWordBoundary,
-                    ast::Pred::IsNotAtWordBoundary => program::Pred::IsNotAtWordBoundary,
-                }
-            },
-            program::NULL_INSTR_PTR,
-        ));
+        let mut pred = match pred {
+            ast::Pred::IsAtStartOfText => program::Pred::IsAtStartOfText,
+            ast::Pred::IsAtEndOfText => program::Pred::IsAtEndOfText,
+            ast::Pred::IsAtWordBoundary => program::Pred::IsAtWordBoundary,
+            ast::Pred::IsNotAtWordBoundary => program::Pred::IsNotAtWordBoundary,
+        };
+        if self.options.reverse {
+            pred = pred.reverse();
+        }
+        let instr = self.emit_instr(Instr::Assert(pred, program::NULL_INSTR_PTR));
+        match pred {
+            program::Pred::IsAtWordBoundary | program::Pred::IsNotAtWordBoundary => {
+                self.contains_non_ascii_assert = true;
+                self.byte_classes.insert(Range::new(0x0, 0x7F));
+            }
+            _ => {}
+        }
         Frag {
             start: instr,
             ends: HolePtrList::unit(HolePtr::next_0(instr)),
@@ -388,14 +390,13 @@ impl<'a> SuffixTree<'a> {
 
     fn prefix_len(&self, byte_ranges: &[Range<u8>]) -> usize {
         if self.options.reverse {
-            0
-        } else {
-            byte_ranges
-                .iter()
-                .zip(self.suffix_nodes.iter())
-                .take_while(|&(&byte_range, state)| byte_range == state.byte_range)
-                .count()
+            return 0;
         }
+        byte_ranges
+            .iter()
+            .zip(self.suffix_nodes.iter())
+            .take_while(|&(&byte_range, state)| byte_range == state.byte_range)
+            .count()
     }
 
     fn generate_suffix(&mut self, start: usize) -> InstrPtr {
