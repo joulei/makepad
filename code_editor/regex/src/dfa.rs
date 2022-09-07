@@ -14,6 +14,7 @@ const ERROR_STATE_PTR: StatePtr = (1 << 31) + 2;
 
 #[derive(Clone, Debug)]
 pub struct Dfa {
+    cache_size: usize,
     start_state_cache: Box<[StatePtr]>,
     state_cache: HashMap<StateId, StatePtr>,
     state_ids: Vec<StateId>,
@@ -26,6 +27,7 @@ pub struct Dfa {
 impl Dfa {
     pub(crate) fn new() -> Self {
         Self {
+            cache_size: 0,
             start_state_cache: vec![UNKNOWN_STATE_PTR; 1 << 5].into_boxed_slice(),
             state_cache: HashMap::new(),
             state_ids: Vec::new(),
@@ -51,6 +53,7 @@ impl Dfa {
             state_cache: &mut self.state_cache,
             state_ids: &mut self.state_ids,
             next_states: &mut self.next_states,
+            cache_size: &mut self.cache_size,
             current_threads: &mut self.current_threads,
             next_threads: &mut self.next_threads,
             stack: &mut self.stack,
@@ -84,6 +87,7 @@ struct RunContext<'a, C> {
     state_cache: &'a mut HashMap<StateId, StatePtr>,
     state_ids: &'a mut Vec<StateId>,
     next_states: &'a mut Vec<StatePtr>,
+    cache_size: &'a mut usize,
     current_threads: &'a mut Threads,
     next_threads: &'a mut Threads,
     stack: &'a mut Vec<InstrPtr>,
@@ -174,7 +178,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
     fn get_or_create_next_state(&mut self, state: &mut StatePtr, byte: Option<u8>) -> StatePtr {
         use {crate::CharExt, std::mem};
 
-        let state_id = &self.state_ids[*state as usize];
+        let state_id = self.state_id(*state).clone();
         for instr in state_id.instrs() {
             self.current_threads.instrs.insert(instr);
         }
@@ -184,7 +188,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             flags.set_prev_byte_is_ascii_word();
         }
         if state_id.flags.contains_assert_instr() {
-            let prev_byte_is_ascii_word = self.state_ids[*state as usize]
+            let prev_byte_is_ascii_word = self.state_id(*state)
                 .flags
                 .prev_byte_is_ascii_word();
             let preds = Preds {
@@ -239,14 +243,16 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         next_state
     }
 
+    fn state_id(&self, state: StatePtr) -> &StateId {
+        &self.state_ids[state as usize / self.program.byte_classes.len() as usize]
+    }
+
     fn next_state(&self, state: StatePtr, byte_class: u8) -> &StatePtr {
-        &self.next_states
-            [state as usize * self.program.byte_classes.len() as usize + byte_class as usize]
+        &self.next_states[state as usize + byte_class as usize]
     }
 
     fn next_state_mut(&mut self, state: StatePtr, byte_class: u8) -> &mut StatePtr {
-        &mut self.next_states
-            [state as usize * self.program.byte_classes.len() as usize + byte_class as usize]
+        &mut self.next_states[state as usize + byte_class as usize]
     }
 
     fn get_or_create_state(
@@ -257,33 +263,41 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         if let Some(&state) = self.state_cache.get(&state_id) {
             return state;
         }
-        match retained_state {
-            Some(retained_state) => {
-                let retained_state_id = self.state_ids[*retained_state as usize].clone();
-                self.clear_state_cache();
-                *retained_state = self.create_state(retained_state_id);
+        if *self.cache_size > 1024 {
+            match retained_state {
+                Some(retained_state) => {
+                    let retained_state_id = self.state_id(*retained_state).clone();
+                    self.clear_cache();
+                    *retained_state = self.create_state(retained_state_id);
+                }
+                None => self.clear_cache(),
             }
-            None => self.clear_state_cache(),
         }
         self.create_state(state_id)
     }
 
     fn create_state(&mut self, state_id: StateId) -> StatePtr {
-        use std::iter;
+        use std::{iter, mem};
 
-        let state_ptr = self.state_ids.len() as StatePtr;
+        *self.cache_size += mem::size_of::<StateId>()
+            + state_id.bytes.len()    
+            + self.program.byte_classes.len() as usize * mem::size_of::<StatePtr>();
+        let state_ptr = self.next_states.len() as StatePtr;        
         self.state_ids.push(state_id);
         self.next_states
             .extend(iter::repeat(UNKNOWN_STATE_PTR).take(self.program.byte_classes.len() as usize));
+
         state_ptr
     }
 
-    fn clear_state_cache(&mut self) {
+    fn clear_cache(&mut self) {
         for state in self.start_state_cache.iter_mut() {
             *state = UNKNOWN_STATE_PTR;
         }
         self.state_cache.clear();
         self.state_ids.clear();
+        self.next_states.clear();
+        *self.cache_size = 0;
     }
 }
 
