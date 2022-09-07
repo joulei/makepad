@@ -16,22 +16,6 @@ impl<'a> StrCursor<'a> {
 }
 
 impl<'a> Cursor for StrCursor<'a> {
-    fn is_at_start_of_text(&self) -> bool {
-        self.byte_position == 0
-    }
-
-    fn is_at_end_of_text(&self) -> bool {
-        self.byte_position == self.string.len()
-    }
-
-    fn is_at_word_boundary(&self) -> bool {
-        use crate::CharExt;
-
-        let prev_ch = self.string[..self.byte_position].chars().next_back();
-        let next_ch = self.string[self.byte_position..].chars().next();
-        prev_ch.map_or(false, |ch| ch.is_word()) != next_ch.map_or(false, |ch| ch.is_word())
-    }
-
     fn byte_position(&self) -> usize {
         self.byte_position
     }
@@ -46,6 +30,14 @@ impl<'a> Cursor for StrCursor<'a> {
         self.string.as_bytes()[..self.byte_position()]
             .last()
             .cloned()
+    }
+
+    fn peek_next_char(&self) -> Option<char> {
+        self.string[self.byte_position..].chars().next()
+    }
+
+    fn peek_prev_char(&self) -> Option<char> {
+        self.string[..self.byte_position].chars().next_back()
     }
 
     fn move_to(&mut self, position: usize) {
