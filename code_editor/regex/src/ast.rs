@@ -16,6 +16,8 @@ pub(crate) enum Ast {
 pub(crate) enum Pred {
     IsAtStartOfText,
     IsAtEndOfText,
+    IsAtStartOfLine,
+    IsAtEndOfLine,
     IsAtWordBoundary,
     IsNotAtWordBoundary,
 }

@@ -255,6 +255,8 @@ impl<'a> CompileContext<'a> {
         let mut pred = match pred {
             ast::Pred::IsAtStartOfText => program::Pred::IsAtStartOfText,
             ast::Pred::IsAtEndOfText => program::Pred::IsAtEndOfText,
+            ast::Pred::IsAtStartOfLine => program::Pred::IsAtStartOfLine,
+            ast::Pred::IsAtEndOfLine => program::Pred::IsAtEndOfLine,
             ast::Pred::IsAtWordBoundary => program::Pred::IsAtWordBoundary,
             ast::Pred::IsNotAtWordBoundary => program::Pred::IsNotAtWordBoundary,
         };
@@ -262,12 +264,8 @@ impl<'a> CompileContext<'a> {
             pred = pred.reverse();
         }
         let instr = self.emit_instr(Instr::Assert(pred, program::NULL_INSTR_PTR));
-        match pred {
-            program::Pred::IsAtWordBoundary | program::Pred::IsNotAtWordBoundary => {
-                self.contains_non_ascii_assert = true;
-                self.byte_classes.insert(Range::new(0x0, 0x7F));
-            }
-            _ => {}
+        if pred.is_non_ascii() {
+            self.byte_classes.insert(Range::new(0x0, 0x7F));
         }
         Frag {
             start: instr,

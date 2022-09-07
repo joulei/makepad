@@ -10,13 +10,20 @@ pub trait Cursor {
     fn next_char(&mut self) -> Option<char>;
     fn prev_char(&mut self) -> Option<char>;
 
-
     fn is_at_start_of_text(&self) -> bool {
         self.peek_prev_char().is_none()
     }
 
     fn is_at_end_of_text(&self) -> bool {
         self.peek_next_char().is_none()
+    }
+
+    fn is_at_start_of_line(&self) -> bool {
+        unimplemented!()
+    }
+
+    fn is_at_end_of_line(&self) -> bool {
+        unimplemented!()
     }
 
     fn is_at_word_boundary(&self) -> bool {

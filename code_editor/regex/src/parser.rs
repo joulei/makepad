@@ -28,7 +28,7 @@ impl Parser {
             pattern,
             byte_position: 0,
             cap_count: 1,
-            group: Group::new(Some(0), Flags::default()),
+            group: Group::new(GroupFlags::default(), Some(0), ),
         }
         .parse()
     }
@@ -112,38 +112,48 @@ impl<'a> ParseContext<'a> {
                 (Some('^'), _) => {
                     self.skip_char();
                     self.maybe_push_cat();
-                    self.asts.push(Ast::Assert(Pred::IsAtStartOfText));
+                    self.asts.push(Ast::Assert(if self.group.flags.multiline {
+                        Pred::IsAtStartOfLine
+                    } else {
+                        Pred::IsAtStartOfText
+                    }));
                     self.group.ast_count += 1;
                 }
                 (Some('$'), _) => {
                     self.skip_char();
                     self.maybe_push_cat();
-                    self.asts.push(Ast::Assert(Pred::IsAtEndOfText));
+                    self.asts.push(Ast::Assert(if self.group.flags.multiline {
+                        Pred::IsAtEndOfLine
+                    } else {
+                        Pred::IsAtEndOfText
+                    }));
                     self.group.ast_count += 1;
                 }
                 (Some('\\'), Some('b')) => {
-                    self.skip_char();
+                    self.skip_two_chars();
                     self.maybe_push_cat();
                     self.asts.push(Ast::Assert(Pred::IsAtWordBoundary));
                     self.group.ast_count += 1;
                 }
                 (Some('\\'), Some('B')) => {
-                    self.skip_char();
+                    self.skip_two_chars();
                     self.maybe_push_cat();
                     self.asts.push(Ast::Assert(Pred::IsNotAtWordBoundary));
                     self.group.ast_count += 1;
                 }
                 (Some('('), _) => {
                     self.skip_char();
+                    let mut flags = GroupFlags::default();
                     let mut non_capturing = false;
-                    match self.peek_two_chars() {
-                        (Some('?'), Some(':')) => {
-                            self.skip_two_chars();
+                    if self.peek_char() == Some('?') {
+                        flags = self.parse_group_flags()?;
+                        if self.peek_char() == Some(':') {
+                            self.skip_char();
                             non_capturing = true;
                         }
-                        _ => {}
-                    };
-                    self.push_group(non_capturing, Flags::default());
+                    }
+                    // TODO: Set flags for current group
+                    self.push_group(flags, non_capturing);
                 }
                 (Some(')'), _) => {
                     self.skip_char();
@@ -215,6 +225,26 @@ impl<'a> ParseContext<'a> {
             non_greedy = true;
         }
         Some((min, max, non_greedy))
+    }
+
+    fn parse_group_flags(&mut self) -> Result<GroupFlags, ParseError> {
+        self.skip_char();
+        let mut flags = GroupFlags::default();
+        loop {
+            match self.peek_char() {
+                Some(':') | Some(')') => break,
+                Some('i') => {
+                    self.skip_char();
+                    flags.ignore_case = true
+                },
+                Some('m') => {
+                    self.skip_char();
+                    flags.multiline = true
+                },
+                _ => return Err(ParseError),
+            }
+        }
+        Ok(flags)
     }
 
     fn parse_char_class(&mut self) -> Result<CharClass, ParseError> {
@@ -414,7 +444,7 @@ impl<'a> ParseContext<'a> {
         self.byte_position += ch_0.unwrap().len_utf8() + ch_1.unwrap().len_utf8();
     }
 
-    fn push_group(&mut self, non_capturing: bool, flags: Flags) {
+    fn push_group(&mut self, flags: GroupFlags, non_capturing: bool) {
         use std::mem;
 
         self.maybe_push_cat();
@@ -426,7 +456,7 @@ impl<'a> ParseContext<'a> {
             self.cap_count += 1;
             Some(cap_index)
         };
-        let group = mem::replace(&mut self.group, Group::new(cap_index, flags));
+        let group = mem::replace(&mut self.group, Group::new(flags, cap_index));
         self.groups.push(group);
     }
 
@@ -524,18 +554,18 @@ impl error::Error for ParseError {}
 
 #[derive(Clone, Copy, Debug)]
 struct Group {
+    flags: GroupFlags,
     cap_index: Option<usize>,
-    flags: Flags,
     ast_count: usize,
     alt_count: usize,
     cat_count: usize,
 }
 
 impl Group {
-    fn new(cap_index: Option<usize>, flags: Flags) -> Self {
+    fn new(flags: GroupFlags, cap_index: Option<usize>) -> Self {
         Self {
-            cap_index,
             flags,
+            cap_index,
             ast_count: 0,
             alt_count: 0,
             cat_count: 0,
@@ -544,6 +574,7 @@ impl Group {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct Flags {
+struct GroupFlags {
     ignore_case: bool,
+    multiline: bool,
 }

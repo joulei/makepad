@@ -32,9 +32,9 @@ mod tests {
 
     #[test]
     fn test() {
-        let regex = Regex::new("abc").unwrap();
+        let regex = Regex::new("(?m:^abc$)").unwrap();
         let mut slots = [None; 2];
-        println!("{:?}", regex.run("f", &mut slots));
+        println!("{:?}", regex.run("abc\nabc\nabc", &mut slots));
         println!("{:?}", slots);
     }
 }

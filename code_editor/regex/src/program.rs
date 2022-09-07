@@ -87,15 +87,29 @@ pub(crate) type InstrPtr = usize;
 pub(crate) enum Pred {
     IsAtStartOfText,
     IsAtEndOfText,
+    IsAtStartOfLine,
+    IsAtEndOfLine,
     IsAtWordBoundary,
     IsNotAtWordBoundary,
 }
 
 impl Pred {
+    pub(crate) fn is_non_ascii(self) -> bool {
+        match self {
+            Pred::IsAtStartOfLine
+            | Pred::IsAtEndOfLine
+            | Pred::IsAtWordBoundary
+            | Pred::IsNotAtWordBoundary => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn reverse(self) -> Self {
         match self {
             Pred::IsAtStartOfText => Pred::IsAtEndOfText,
             Pred::IsAtEndOfText => Pred::IsAtStartOfText,
+            Pred::IsAtStartOfLine => Pred::IsAtEndOfLine,
+            Pred::IsAtEndOfLine => Pred::IsAtStartOfLine,
             pred => pred,
         }
     }

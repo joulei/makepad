@@ -154,23 +154,25 @@ impl<'a, C: Cursor> RunContext<'a, C> {
     fn get_or_create_start_state(&mut self) -> Result<StatePtr, RunError> {
         use crate::CharExt;
 
-        let prev_byte_is_ascii_word = self
-            .cursor
-            .peek_prev_byte()
-            .map_or(false, |b| (b as char).is_ascii_word());
-        let next_byte_is_ascii_word = self
-            .cursor
-            .peek_next_byte()
-            .map_or(false, |b| (b as char).is_ascii_word());
+        let prev_byte = self.cursor.peek_prev_byte();
+        let next_byte = self.cursor.peek_next_byte();
+        let prev_byte_is_cr = prev_byte.map_or(false, |byte| byte == 0x0D);
+        let prev_byte_is_lf = prev_byte.map_or(false, |byte| byte == 0x0A);
+        let prev_byte_is_ascii_word = prev_byte.map_or(false, |byte| (byte as char).is_ascii_word());
+        let next_byte_is_cr = next_byte.map_or(false, |byte| byte == 0x0D);
+        let next_byte_is_lf = next_byte.map_or(false, |byte| byte == 0x0A);
+        let next_byte_is_ascii_word = next_byte.map_or(false, |byte| (byte as char).is_ascii_word());
         let preds = Preds {
-            is_at_start_of_text: self.cursor.is_at_start_of_text(),
-            is_at_end_of_text: self.cursor.is_at_end_of_text(),
+            is_at_start_of_text: prev_byte.is_none(),
+            is_at_end_of_text: next_byte.is_none(),
+            is_at_ascii_start_of_line: prev_byte_is_lf || prev_byte_is_cr && !next_byte_is_lf,
+            is_at_ascii_end_of_line: next_byte_is_cr || next_byte_is_lf && !prev_byte_is_cr,
             is_at_ascii_word_boundary: prev_byte_is_ascii_word != next_byte_is_ascii_word,
         };
         let bits = preds.to_bits() as usize;
         Ok(match self.start_state_cache[bits] {
             UNKNOWN_STATE_PTR => {
-                let mut flags = Flags::default();
+                let mut flags = StateFlags::default();
                 self.current_threads.add_thread(
                     self.program.start,
                     preds,
@@ -199,15 +201,27 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         for instr in state_id.instrs() {
             self.current_threads.instrs.insert(instr);
         }
-        let mut flags = Flags::default();
+        let mut next_flags = StateFlags::default();
+        let next_byte_is_cr = byte.map_or(false, |byte| byte == 0x0D);
+        if next_byte_is_cr {
+            next_flags.set_prev_byte_is_cr()
+        }
+        let next_byte_is_lf = byte.map_or(false, |byte| byte == 0x0A);
+        if next_byte_is_lf {
+            next_flags.set_prev_byte_is_lf()
+        }
         let next_byte_is_ascii_word = byte.map_or(false, |byte| (byte as char).is_ascii_word());
         if next_byte_is_ascii_word {
-            flags.set_prev_byte_is_ascii_word();
+            next_flags.set_prev_byte_is_ascii_word();
         }
         if state_id.flags.contains_assert() {
-            let prev_byte_is_ascii_word = self.state_id(*state).flags.prev_byte_is_ascii_word();
+            let prev_byte_is_cr = state_id.flags.prev_byte_is_cr();
+            let prev_byte_is_lf = state_id.flags.prev_byte_is_lf();
+            let prev_byte_is_ascii_word = state_id.flags.prev_byte_is_ascii_word();
             let preds = Preds {
                 is_at_end_of_text: byte.is_none(),
+                is_at_ascii_start_of_line: prev_byte_is_lf || prev_byte_is_cr && !next_byte_is_lf,
+                is_at_ascii_end_of_line: next_byte_is_cr || next_byte_is_lf && !prev_byte_is_cr,
                 is_at_ascii_word_boundary: prev_byte_is_ascii_word != next_byte_is_ascii_word,
                 ..Preds::default()
             };
@@ -215,7 +229,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 self.next_threads.add_thread(
                     instr,
                     preds,
-                    &mut flags,
+                    &mut next_flags,
                     &self.program.instrs,
                     &mut self.stack,
                 );
@@ -226,7 +240,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         for &instr in self.current_threads.instrs.as_slice() {
             match self.program.instrs[instr] {
                 Instr::Match => {
-                    flags.set_matched();
+                    next_flags.set_matched();
                     if !self.options.continue_until_last_match {
                         break;
                     }
@@ -236,7 +250,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                         self.next_threads.add_thread(
                             next,
                             Preds::default(),
-                            &mut flags,
+                            &mut next_flags,
                             &self.program.instrs,
                             &mut self.stack,
                         );
@@ -245,14 +259,14 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 _ => {}
             }
         }
-        if !flags.matched() && self.next_threads.instrs.is_empty() {
+        if !next_flags.matched() && self.next_threads.instrs.is_empty() {
             return Ok(DEAD_STATE_PTR);
         }
-        let next_state_id = StateId::new(flags, self.next_threads.instrs.as_slice());
+        let next_state_id = StateId::new(next_flags, self.next_threads.instrs.as_slice());
         self.current_threads.instrs.clear();
         self.next_threads.instrs.clear();
         let mut next_state = self.get_or_create_state(next_state_id, Some(state))?;
-        if flags.matched() {
+        if next_flags.matched() {
             next_state |= MATCHED_FLAG;
         }
         Ok(next_state)
@@ -326,12 +340,12 @@ type StatePtr = u32;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct StateId {
-    flags: Flags,
+    flags: StateFlags,
     bytes: Rc<[u8]>,
 }
 
 impl StateId {
-    fn new(flags: Flags, instrs: &[InstrPtr]) -> Self {
+    fn new(flags: StateFlags, instrs: &[InstrPtr]) -> Self {
         use makepad_varint::WriteVarint;
 
         let mut bytes = Vec::new();
@@ -356,9 +370,9 @@ impl StateId {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-struct Flags(u8);
+struct StateFlags(u8);
 
-impl Flags {
+impl StateFlags {
     fn matched(&self) -> bool {
         self.0 & 1 << 0 != 0
     }
@@ -375,12 +389,28 @@ impl Flags {
         self.0 |= 1 << 1
     }
 
-    fn prev_byte_is_ascii_word(&self) -> bool {
+    fn prev_byte_is_cr(&self) -> bool {
         self.0 & 1 << 2 != 0
     }
 
+    fn set_prev_byte_is_cr(&mut self) {
+        self.0 |= 1 << 2
+    }
+
+    fn prev_byte_is_lf(&self) -> bool {
+        self.0 & 1 << 3 != 0
+    }
+
+    fn set_prev_byte_is_lf(&mut self) {
+        self.0 |= 1 << 3
+    }
+
+    fn prev_byte_is_ascii_word(&self) -> bool {
+        self.0 & 1 << 4 != 0
+    }
+
     fn set_prev_byte_is_ascii_word(&mut self) {
-        self.0 |= 1 << 2;
+        self.0 |= 1 << 4;
     }
 }
 
@@ -421,7 +451,7 @@ impl Threads {
         &mut self,
         instr: InstrPtr,
         preds: Preds,
-        flags: &mut Flags,
+        flags: &mut StateFlags,
         instrs: &[Instr],
         stack: &mut Vec<InstrPtr>,
     ) {
@@ -437,6 +467,8 @@ impl Threads {
                         if match pred {
                             Pred::IsAtStartOfText => preds.is_at_start_of_text,
                             Pred::IsAtEndOfText => preds.is_at_end_of_text,
+                            Pred::IsAtStartOfLine => preds.is_at_ascii_start_of_line,
+                            Pred::IsAtEndOfLine => preds.is_at_ascii_end_of_line,
                             Pred::IsAtWordBoundary => preds.is_at_ascii_word_boundary,
                             Pred::IsNotAtWordBoundary => !preds.is_at_ascii_word_boundary,
                         } {
@@ -460,6 +492,8 @@ impl Threads {
 struct Preds {
     is_at_start_of_text: bool,
     is_at_end_of_text: bool,
+    is_at_ascii_start_of_line: bool,
+    is_at_ascii_end_of_line: bool,
     is_at_ascii_word_boundary: bool,
 }
 
@@ -468,6 +502,9 @@ impl Preds {
         let mut bits = 0;
         bits |= (self.is_at_start_of_text as u8) << 0;
         bits |= (self.is_at_end_of_text as u8) << 1;
+        bits |= (self.is_at_ascii_start_of_line as u8) << 2;
+        bits |= (self.is_at_ascii_end_of_line as u8) << 3;
+        bits |= (self.is_at_ascii_word_boundary as u8) << 4;
         bits
     }
 }

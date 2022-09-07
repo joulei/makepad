@@ -145,6 +145,8 @@ impl Threads {
                             if match pred {
                                 Pred::IsAtStartOfText => cursor.is_at_start_of_text(),
                                 Pred::IsAtEndOfText => cursor.is_at_end_of_text(),
+                                Pred::IsAtStartOfLine => cursor.is_at_start_of_line(),
+                                Pred::IsAtEndOfLine => cursor.is_at_end_of_line(),
                                 Pred::IsAtWordBoundary => cursor.is_at_word_boundary(),
                                 Pred::IsNotAtWordBoundary => !cursor.is_at_word_boundary(),
                             } {
