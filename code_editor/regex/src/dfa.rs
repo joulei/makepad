@@ -15,7 +15,9 @@ const ERROR_STATE_PTR: StatePtr = (1 << 31) + 2;
 #[derive(Clone, Debug)]
 pub struct Dfa {
     start_state_cache: Box<[StatePtr]>,
-    states: States,
+    state_cache: HashMap<StateId, StatePtr>,
+    state_ids: Vec<StateId>,
+    next_states: Vec<StatePtr>,
     current_threads: Threads,
     next_threads: Threads,
     stack: Vec<InstrPtr>,
@@ -25,12 +27,9 @@ impl Dfa {
     pub(crate) fn new() -> Self {
         Self {
             start_state_cache: vec![UNKNOWN_STATE_PTR; 1 << 5].into_boxed_slice(),
-            states: States {
-                byte_class_count: 0,
-                state_cache: HashMap::new(),
-                state_ids: Vec::new(),
-                next_states: Vec::new(),
-            },
+            state_cache: HashMap::new(),
+            state_ids: Vec::new(),
+            next_states: Vec::new(),
             current_threads: Threads::new(0),
             next_threads: Threads::new(0),
             stack: Vec::new(),
@@ -47,10 +46,11 @@ impl Dfa {
             self.current_threads = Threads::new(program.instrs.len());
             self.next_threads = Threads::new(program.instrs.len());
         }
-        self.states.byte_class_count = program.byte_classes.len();
         RunContext {
             start_state_cache: &mut self.start_state_cache,
-            states: &mut self.states,
+            state_cache: &mut self.state_cache,
+            state_ids: &mut self.state_ids,
+            next_states: &mut self.next_states,
             current_threads: &mut self.current_threads,
             next_threads: &mut self.next_threads,
             stack: &mut self.stack,
@@ -81,7 +81,9 @@ impl error::Error for RunError {}
 
 struct RunContext<'a, C> {
     start_state_cache: &'a mut [StatePtr],
-    states: &'a mut States,
+    state_cache: &'a mut HashMap<StateId, StatePtr>,
+    state_ids: &'a mut Vec<StateId>,
+    next_states: &'a mut Vec<StatePtr>,
     current_threads: &'a mut Threads,
     next_threads: &'a mut Threads,
     stack: &'a mut Vec<InstrPtr>,
@@ -100,14 +102,14 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 current_state = next_state;
                 let byte = self.cursor.next_byte().unwrap();
                 let byte_class = self.program.byte_classes.get(byte);
-                next_state = *self.states.next_state(current_state, byte_class);
+                next_state = *self.next_state(current_state, byte_class);
             }
             if next_state == UNKNOWN_STATE_PTR {
                 let byte = self.cursor.prev_byte().unwrap();
                 self.cursor.next_byte().unwrap();
                 let byte_class = self.program.byte_classes.get(byte);
-                next_state = self.get_or_create_next_state(current_state, Some(byte));
-                *self.states.next_state_mut(current_state, byte_class) = next_state;
+                next_state = self.get_or_create_next_state(&mut current_state, Some(byte));
+                *self.next_state_mut(current_state, byte_class) = next_state;
             }
             if next_state & MATCHED_FLAG != 0 {
                 self.cursor.prev_byte().unwrap();
@@ -125,7 +127,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         }
         next_state &= MAX_STATE_PTR;
         current_state = next_state;
-        next_state = self.get_or_create_next_state(current_state, None);
+        next_state = self.get_or_create_next_state(&mut current_state, None);
         if next_state & MATCHED_FLAG != 0 {
             matched = Some(self.cursor.byte_position());
         }
@@ -161,7 +163,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 );
                 let state_id = StateId::new(flags, self.current_threads.instrs.as_slice());
                 self.current_threads.instrs.clear();
-                let state = self.states.get_or_create_state(state_id);
+                let state = self.get_or_create_state(state_id, None);
                 self.start_state_cache[bits] = state;
                 state
             }
@@ -169,10 +171,10 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         }
     }
 
-    fn get_or_create_next_state(&mut self, state: StatePtr, byte: Option<u8>) -> StatePtr {
+    fn get_or_create_next_state(&mut self, state: &mut StatePtr, byte: Option<u8>) -> StatePtr {
         use {crate::CharExt, std::mem};
 
-        let state_id = &self.states.state_ids[state as usize];
+        let state_id = &self.state_ids[*state as usize];
         for instr in state_id.instrs() {
             self.current_threads.instrs.insert(instr);
         }
@@ -182,7 +184,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             flags.set_prev_byte_is_ascii_word();
         }
         if state_id.flags.contains_assert_instr() {
-            let prev_byte_is_ascii_word = self.states.state_ids[state as usize]
+            let prev_byte_is_ascii_word = self.state_ids[*state as usize]
                 .flags
                 .prev_byte_is_ascii_word();
             let preds = Preds {
@@ -230,46 +232,58 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         let next_state_id = StateId::new(flags, self.next_threads.instrs.as_slice());
         self.current_threads.instrs.clear();
         self.next_threads.instrs.clear();
-        let mut next_state = self.states.get_or_create_state(next_state_id);
-
+        let mut next_state = self.get_or_create_state(next_state_id, Some(state));
         if flags.matched() {
             next_state |= MATCHED_FLAG;
         }
         next_state
     }
-}
 
-#[derive(Clone, Debug)]
-struct States {
-    byte_class_count: u16,
-    state_cache: HashMap<StateId, StatePtr>,
-    state_ids: Vec<StateId>,
-    next_states: Vec<StatePtr>,
-}
-
-impl States {
     fn next_state(&self, state: StatePtr, byte_class: u8) -> &StatePtr {
-        &self.next_states[state as usize * self.byte_class_count as usize + byte_class as usize]
+        &self.next_states
+            [state as usize * self.program.byte_classes.len() as usize + byte_class as usize]
     }
 
     fn next_state_mut(&mut self, state: StatePtr, byte_class: u8) -> &mut StatePtr {
-        &mut self.next_states[state as usize * self.byte_class_count as usize + byte_class as usize]
+        &mut self.next_states
+            [state as usize * self.program.byte_classes.len() as usize + byte_class as usize]
     }
 
-    fn get_or_create_state(&mut self, state_id: StateId) -> StatePtr {
+    fn get_or_create_state(
+        &mut self,
+        state_id: StateId,
+        retained_state: Option<&mut StatePtr>,
+    ) -> StatePtr {
+        if let Some(&state) = self.state_cache.get(&state_id) {
+            return state;
+        }
+        match retained_state {
+            Some(retained_state) => {
+                let retained_state_id = self.state_ids[*retained_state as usize].clone();
+                self.clear_state_cache();
+                *retained_state = self.create_state(retained_state_id);
+            }
+            None => self.clear_state_cache(),
+        }
+        self.create_state(state_id)
+    }
+
+    fn create_state(&mut self, state_id: StateId) -> StatePtr {
         use std::iter;
 
-        *self.state_cache.entry(state_id.clone()).or_insert_with({
-            let byte_class_count = self.byte_class_count;
-            let state_ids = &mut self.state_ids;
-            let next_states = &mut self.next_states;
-            move || {
-                let state_ptr = state_ids.len() as StatePtr;
-                state_ids.push(state_id);
-                next_states.extend(iter::repeat(UNKNOWN_STATE_PTR).take(byte_class_count as usize));
-                state_ptr
-            }
-        })
+        let state_ptr = self.state_ids.len() as StatePtr;
+        self.state_ids.push(state_id);
+        self.next_states
+            .extend(iter::repeat(UNKNOWN_STATE_PTR).take(self.program.byte_classes.len() as usize));
+        state_ptr
+    }
+
+    fn clear_state_cache(&mut self) {
+        for state in self.start_state_cache.iter_mut() {
+            *state = UNKNOWN_STATE_PTR;
+        }
+        self.state_cache.clear();
+        self.state_ids.clear();
     }
 }
 

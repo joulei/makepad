@@ -5,7 +5,7 @@ pub(crate) struct ByteClassSet(Box<[u8]>);
 
 impl ByteClassSet {
     pub(crate) fn len(&self) -> u16 {
-        self.0[255] as u16 + 2
+        self.0[255] as u16 + 1
     }
 
     pub(crate) fn get(&self, byte: u8) -> u8 {
