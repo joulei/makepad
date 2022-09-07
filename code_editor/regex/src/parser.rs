@@ -450,7 +450,7 @@ impl<'a> ParseContext<'a> {
     fn push_char_class(&mut self, mut char_class: CharClass) {
         use std::mem;
 
-        if self.group.flags.case_insensitive {
+        if self.group.flags.ignore_case {
             for char_range in &char_class {
                 self.case_folder.fold(char_range, &mut self.char_class);
             }
@@ -463,7 +463,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn push_char(&mut self, ch: char) {
-        let ast = if self.group.flags.case_insensitive {
+        let ast = if self.group.flags.ignore_case {
             let mut char_class = CharClass::new();
             self.case_folder.fold(Range::new(ch, ch), &mut char_class);
             Ast::CharClass(char_class)
@@ -545,5 +545,5 @@ impl Group {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct Flags {
-    case_insensitive: bool,
+    ignore_case: bool,
 }

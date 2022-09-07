@@ -110,10 +110,7 @@ impl Threads {
     fn new(thread_count: usize, slot_count_per_thread: usize) -> Self {
         Self {
             instrs: SparseSet::new(thread_count),
-            slots: Slots {
-                slot_count_per_thread,
-                slots: vec![None; thread_count * slot_count_per_thread].into_boxed_slice(),
-            },
+            slots: Slots::new(thread_count, slot_count_per_thread),
         }
     }
 
@@ -179,6 +176,13 @@ struct Slots {
 }
 
 impl Slots {
+    fn new(thread_count: usize, slot_count_per_thread: usize) -> Self {
+        Slots {
+            slot_count_per_thread,
+            slots: vec![None; thread_count * slot_count_per_thread].into_boxed_slice(),
+        }
+    }
+
     fn get(&self, instr: InstrPtr) -> &[Option<usize>] {
         &self.slots[instr * self.slot_count_per_thread..][..self.slot_count_per_thread]
     }

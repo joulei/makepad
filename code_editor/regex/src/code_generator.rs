@@ -2,7 +2,7 @@ use {
     crate::{
         ast,
         ast::Quant,
-        program,
+        byte_class_set, program,
         program::{Instr, InstrPtr},
         Ast, CharClass, Program, Range, Utf8Encoder,
     },
@@ -12,7 +12,7 @@ use {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CodeGenerator {
     utf8_encoder: Utf8Encoder,
-    states: Vec<State>,
+    suffix_nodes: Vec<SuffixNode>,
     instr_cache: HashMap<Instr, InstrPtr>,
 }
 
@@ -24,11 +24,12 @@ impl CodeGenerator {
     pub(crate) fn generate(&mut self, ast: &Ast, options: Options) -> Program {
         CompileContext {
             utf8_encoder: &mut self.utf8_encoder,
-            states: &mut self.states,
+            suffix_nodes: &mut self.suffix_nodes,
             instr_cache: &mut self.instr_cache,
             options,
             slot_count: 0,
-            instrs: Vec::new(),
+            emitter: Emitter { instrs: Vec::new() },
+            byte_classes: byte_class_set::Builder::new(),
         }
         .generate(ast)
     }
@@ -38,17 +39,18 @@ impl CodeGenerator {
 pub(crate) struct Options {
     pub(crate) reverse: bool,
     pub(crate) dot_star: bool,
-    pub(crate) bytes: bool,
+    pub(crate) use_bytes: bool,
 }
 
 #[derive(Debug)]
 struct CompileContext<'a> {
     utf8_encoder: &'a mut Utf8Encoder,
-    states: &'a mut Vec<State>,
+    suffix_nodes: &'a mut Vec<SuffixNode>,
     instr_cache: &'a mut HashMap<Instr, InstrPtr>,
     options: Options,
     slot_count: usize,
-    instrs: Vec<Instr>,
+    emitter: Emitter,
+    byte_classes: byte_class_set::Builder,
 }
 
 impl<'a> CompileContext<'a> {
@@ -65,8 +67,9 @@ impl<'a> CompileContext<'a> {
         }
         Program {
             slot_count: self.slot_count,
-            instrs: self.instrs,
+            instrs: self.emitter.instrs,
             start: frag.start,
+            byte_classes: self.byte_classes.build(),
         }
     }
 
@@ -167,6 +170,7 @@ impl<'a> CompileContext<'a> {
 
     fn generate_byte_range(&mut self, byte_range: Range<u8>) -> Frag {
         let instr = self.emit_instr(Instr::ByteRange(byte_range, program::NULL_INSTR_PTR));
+        self.byte_classes.insert(byte_range);
         Frag {
             start: instr,
             ends: HolePtrList::unit(HolePtr::next_0(instr)),
@@ -174,7 +178,7 @@ impl<'a> CompileContext<'a> {
     }
 
     fn generate_char(&mut self, ch: char) -> Frag {
-        if self.options.bytes {
+        if self.options.use_bytes {
             let mut bytes = [0; 4];
             let mut bytes = ch.encode_utf8(&mut bytes).bytes();
             let byte = bytes.next().unwrap();
@@ -194,13 +198,14 @@ impl<'a> CompileContext<'a> {
     }
 
     fn generate_char_class(&mut self, char_class: &CharClass) -> Frag {
-        if self.options.bytes {
+        if self.options.use_bytes {
             let mut suffix_tree = SuffixTree {
-                states: self.states,
+                suffix_nodes: self.suffix_nodes,
                 suffix_cache: SuffixCache {
                     instr_cache: self.instr_cache,
-                    instrs: &mut self.instrs,
                 },
+                emitter: &mut self.emitter,
+                byte_classes: &mut self.byte_classes,
                 options: self.options,
                 ends: HolePtrList::new(),
             };
@@ -236,7 +241,7 @@ impl<'a> CompileContext<'a> {
         self.slot_count = self.slot_count.max(first_slot_index + 2);
         let instr_0 = self.emit_instr(Instr::Save(first_slot_index, frag.start));
         let instr_1 = self.emit_instr(Instr::Save(first_slot_index + 1, program::NULL_INSTR_PTR));
-        frag.ends.fill(instr_1, &mut self.instrs);
+        frag.ends.fill(instr_1, &mut self.emitter.instrs);
         Frag {
             start: instr_0,
             ends: HolePtrList::unit(HolePtr::next_0(instr_1)),
@@ -280,7 +285,7 @@ impl<'a> CompileContext<'a> {
         }
         Frag {
             start: instr,
-            ends: frag.ends.append(hole, &mut self.instrs),
+            ends: frag.ends.append(hole, &mut self.emitter.instrs),
         }
     }
 
@@ -294,7 +299,7 @@ impl<'a> CompileContext<'a> {
             instr = self.emit_instr(Instr::Split(frag.start, program::NULL_INSTR_PTR));
             hole = HolePtr::next_1(instr);
         }
-        frag.ends.fill(instr, &mut self.instrs);
+        frag.ends.fill(instr, &mut self.emitter.instrs);
         Frag {
             start: instr,
             ends: HolePtrList::unit(hole),
@@ -311,7 +316,7 @@ impl<'a> CompileContext<'a> {
             instr = self.emit_instr(Instr::Split(frag.start, program::NULL_INSTR_PTR));
             hole = HolePtr::next_1(instr);
         }
-        frag.ends.fill(instr, &mut self.instrs);
+        frag.ends.fill(instr, &mut self.emitter.instrs);
         Frag {
             start: frag.start,
             ends: HolePtrList::unit(hole),
@@ -324,7 +329,7 @@ impl<'a> CompileContext<'a> {
         if self.options.reverse {
             mem::swap(&mut frag_0, &mut frag_1);
         }
-        frag_0.ends.fill(frag_1.start, &mut self.instrs);
+        frag_0.ends.fill(frag_1.start, &mut self.emitter.instrs);
         Frag {
             start: frag_0.start,
             ends: frag_1.ends,
@@ -334,21 +339,23 @@ impl<'a> CompileContext<'a> {
     fn generate_alt(&mut self, frag_0: Frag, frag_1: Frag) -> Frag {
         Frag {
             start: self.emit_instr(Instr::Split(frag_0.start, frag_1.start)),
-            ends: frag_0.ends.concat(frag_1.ends, &mut self.instrs),
+            ends: frag_0.ends.concat(frag_1.ends, &mut self.emitter.instrs),
         }
     }
 
     fn emit_instr(&mut self, instr: Instr) -> InstrPtr {
-        let instr_ptr = self.instrs.len();
-        self.instrs.push(instr);
+        let instr_ptr = self.emitter.instrs.len();
+        self.emitter.instrs.push(instr);
         instr_ptr
     }
 }
 
 #[derive(Debug)]
 struct SuffixTree<'a> {
-    states: &'a mut Vec<State>,
+    suffix_nodes: &'a mut Vec<SuffixNode>,
     suffix_cache: SuffixCache<'a>,
+    emitter: &'a mut Emitter,
+    byte_classes: &'a mut byte_class_set::Builder,
     options: Options,
     ends: HolePtrList,
 }
@@ -359,7 +366,7 @@ impl<'a> SuffixTree<'a> {
         self.suffix_cache.instr_cache.clear();
         if start == program::NULL_INSTR_PTR {
             let instr = self
-                .suffix_cache
+                .emitter
                 .emit_instr(Instr::Empty(program::NULL_INSTR_PTR));
             Frag {
                 start: instr,
@@ -385,7 +392,7 @@ impl<'a> SuffixTree<'a> {
         } else {
             byte_ranges
                 .iter()
-                .zip(self.states.iter())
+                .zip(self.suffix_nodes.iter())
                 .take_while(|&(&byte_range, state)| byte_range == state.byte_range)
                 .count()
         }
@@ -395,20 +402,21 @@ impl<'a> SuffixTree<'a> {
         use std::mem;
 
         let mut acc_instr = program::NULL_INSTR_PTR;
-        for state in self.states.drain(start..).rev() {
+        for state in self.suffix_nodes.drain(start..).rev() {
             let has_hole = acc_instr == program::NULL_INSTR_PTR;
-            let (instr, is_new) = self
-                .suffix_cache
-                .get_or_emit_instr(Instr::ByteRange(state.byte_range, acc_instr));
+            let (instr, is_new) = self.suffix_cache.get_or_emit_instr(
+                Instr::ByteRange(state.byte_range, acc_instr),
+                &mut self.emitter,
+            );
             acc_instr = instr;
             if is_new && has_hole {
                 let ends = mem::replace(&mut self.ends, HolePtrList::new());
-                self.ends = ends.append(HolePtr::next_0(instr), &mut self.suffix_cache.instrs);
+                self.ends = ends.append(HolePtr::next_0(instr), &mut self.emitter.instrs);
             }
             if state.instr != program::NULL_INSTR_PTR {
                 let (instr, _) = self
                     .suffix_cache
-                    .get_or_emit_instr(Instr::Split(state.instr, acc_instr));
+                    .get_or_emit_instr(Instr::Split(state.instr, acc_instr), &mut self.emitter);
                 acc_instr = instr;
             }
         }
@@ -417,15 +425,18 @@ impl<'a> SuffixTree<'a> {
 
     fn extend_suffix(&mut self, generated_instr: InstrPtr, byte_ranges: &[Range<u8>]) {
         let mut byte_ranges = byte_ranges.iter();
-        self.states.push(State {
+        let byte_range = *byte_ranges.next().unwrap();
+        self.suffix_nodes.push(SuffixNode {
             instr: generated_instr,
-            byte_range: *byte_ranges.next().unwrap(),
+            byte_range,
         });
+        self.byte_classes.insert(byte_range);
         for &byte_range in byte_ranges {
-            self.states.push(State {
+            self.suffix_nodes.push(SuffixNode {
                 instr: program::NULL_INSTR_PTR,
                 byte_range,
             });
+            self.byte_classes.insert(byte_range);
         }
     }
 }
@@ -433,32 +444,38 @@ impl<'a> SuffixTree<'a> {
 #[derive(Debug)]
 struct SuffixCache<'a> {
     instr_cache: &'a mut HashMap<Instr, InstrPtr>,
-    instrs: &'a mut Vec<Instr>,
 }
 
 impl<'a> SuffixCache<'a> {
-    fn get_or_emit_instr(&mut self, instr: Instr) -> (InstrPtr, bool) {
+    fn get_or_emit_instr(&mut self, instr: Instr, emitter: &mut Emitter) -> (InstrPtr, bool) {
         match self.instr_cache.get(&instr) {
             Some(&ptr) => (ptr, false),
             None => {
-                let ptr = self.emit_instr(instr.clone());
+                let ptr = emitter.emit_instr(instr.clone());
                 self.instr_cache.insert(instr, ptr);
                 (ptr, true)
             }
         }
     }
+}
 
+#[derive(Clone, Debug)]
+struct SuffixNode {
+    instr: InstrPtr,
+    byte_range: Range<u8>,
+}
+
+#[derive(Debug)]
+struct Emitter {
+    instrs: Vec<Instr>,
+}
+
+impl Emitter {
     fn emit_instr(&mut self, instr: Instr) -> InstrPtr {
         let instr_ptr = self.instrs.len();
         self.instrs.push(instr);
         instr_ptr
     }
-}
-
-#[derive(Clone, Debug)]
-struct State {
-    instr: InstrPtr,
-    byte_range: Range<u8>,
 }
 
 #[derive(Debug)]

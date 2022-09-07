@@ -1,5 +1,5 @@
 use {
-    crate::{CharClass, Range},
+    crate::{ByteClassSet, CharClass, Range},
     std::fmt,
 };
 
@@ -10,6 +10,7 @@ pub(crate) struct Program {
     pub(crate) slot_count: usize,
     pub(crate) instrs: Vec<Instr>,
     pub(crate) start: usize,
+    pub(crate) byte_classes: ByteClassSet,
 }
 
 impl fmt::Debug for Program {
@@ -24,6 +25,7 @@ impl fmt::Debug for Program {
         Ok(())
     }
 }
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Instr {
     Match,

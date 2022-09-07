@@ -26,6 +26,7 @@ impl Dfa {
         Self {
             start_state_cache: vec![UNKNOWN_STATE_PTR; 1 << 5].into_boxed_slice(),
             states: States {
+                byte_class_count: 0,
                 state_cache: HashMap::new(),
                 state_ids: Vec::new(),
                 next_states: Vec::new(),
@@ -46,6 +47,7 @@ impl Dfa {
             self.current_threads = Threads::new(program.instrs.len());
             self.next_threads = Threads::new(program.instrs.len());
         }
+        self.states.byte_class_count = program.byte_classes.len();
         RunContext {
             start_state_cache: &mut self.start_state_cache,
             states: &mut self.states,
@@ -96,15 +98,16 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         while !self.cursor.is_at_end_of_text() {
             while next_state <= MAX_STATE_PTR && !self.cursor.is_at_end_of_text() {
                 current_state = next_state;
-                next_state = *self
-                    .states
-                    .next_state(current_state, self.cursor.next_byte());
+                let byte = self.cursor.next_byte().unwrap();
+                let byte_class = self.program.byte_classes.get(byte);
+                next_state = *self.states.next_state(current_state, byte_class);
             }
             if next_state == UNKNOWN_STATE_PTR {
-                let byte = Some(self.cursor.prev_byte().unwrap());
+                let byte = self.cursor.prev_byte().unwrap();
                 self.cursor.next_byte().unwrap();
-                next_state = self.get_or_create_next_state(current_state, byte);
-                *self.states.next_state_mut(current_state, byte) = next_state;
+                let byte_class = self.program.byte_classes.get(byte);
+                next_state = self.get_or_create_next_state(current_state, Some(byte));
+                *self.states.next_state_mut(current_state, byte_class) = next_state;
             }
             if next_state & MATCHED_FLAG != 0 {
                 self.cursor.prev_byte().unwrap();
@@ -238,30 +241,32 @@ impl<'a, C: Cursor> RunContext<'a, C> {
 
 #[derive(Clone, Debug)]
 struct States {
+    byte_class_count: u16,
     state_cache: HashMap<StateId, StatePtr>,
     state_ids: Vec<StateId>,
     next_states: Vec<StatePtr>,
 }
 
 impl States {
-    fn next_state(&self, state: StatePtr, byte: Option<u8>) -> &StatePtr {
-        &self.next_states[state as usize * 257 + byte.map_or(256, |byte| byte as usize)]
+    fn next_state(&self, state: StatePtr, byte_class: u8) -> &StatePtr {
+        &self.next_states[state as usize * self.byte_class_count as usize + byte_class as usize]
     }
 
-    fn next_state_mut(&mut self, state: StatePtr, byte: Option<u8>) -> &mut StatePtr {
-        &mut self.next_states[state as usize * 257 + byte.map_or(256, |byte| byte as usize)]
+    fn next_state_mut(&mut self, state: StatePtr, byte_class: u8) -> &mut StatePtr {
+        &mut self.next_states[state as usize * self.byte_class_count as usize + byte_class as usize]
     }
 
     fn get_or_create_state(&mut self, state_id: StateId) -> StatePtr {
         use std::iter;
 
         *self.state_cache.entry(state_id.clone()).or_insert_with({
+            let byte_class_count = self.byte_class_count;
             let state_ids = &mut self.state_ids;
             let next_states = &mut self.next_states;
             move || {
                 let state_ptr = state_ids.len() as StatePtr;
                 state_ids.push(state_id);
-                next_states.extend(iter::repeat(UNKNOWN_STATE_PTR).take(257));
+                next_states.extend(iter::repeat(UNKNOWN_STATE_PTR).take(byte_class_count as usize));
                 state_ptr
             }
         })

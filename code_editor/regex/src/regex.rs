@@ -20,7 +20,7 @@ impl Regex {
         let dfa_program = code_generator.generate(
             &ast,
             code_generator::Options {
-                bytes: true,
+                use_bytes: true,
                 dot_star: true,
                 ..code_generator::Options::default()
             },
@@ -28,7 +28,7 @@ impl Regex {
         let reverse_dfa_program = code_generator.generate(
             &ast,
             code_generator::Options {
-                bytes: true,
+                use_bytes: true,
                 reverse: true,
                 ..code_generator::Options::default()
             },
