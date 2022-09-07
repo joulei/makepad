@@ -8,8 +8,10 @@ macro_rules! test_regex {
             let haystack = $haystack;
             let expected: Vec<Option<usize>> = vec![$($expected),*];
             let mut actual = vec![None; expected.len()];
-            regex.run(haystack, &mut actual);
-            assert_eq!(actual, expected);
+            for _ in 0..2 {
+                regex.run(haystack, &mut actual);
+                assert_eq!(actual, expected);
+            }
         }
     );
 }

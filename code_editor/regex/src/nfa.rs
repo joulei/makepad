@@ -91,6 +91,7 @@ impl Nfa {
             mem::swap(&mut self.current_threads, &mut self.new_threads);
             self.new_threads.instrs.clear();
         }
+        self.current_threads.instrs.clear();
         matched
     }
 }
