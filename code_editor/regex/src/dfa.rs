@@ -14,10 +14,11 @@ const ERROR_STATE_PTR: StatePtr = (1 << 31) + 2;
 
 #[derive(Clone, Debug)]
 pub struct Dfa {
-    cache_size: usize,
     start_state_cache: Box<[StatePtr]>,
+    heap_usage: usize,
     state_cache: HashMap<StateId, StatePtr>,
     state_ids: Vec<StateId>,
+    next_state_count_per_state: usize,
     next_states: Vec<StatePtr>,
     current_threads: Threads,
     next_threads: Threads,
@@ -27,10 +28,11 @@ pub struct Dfa {
 impl Dfa {
     pub(crate) fn new() -> Self {
         Self {
-            cache_size: 0,
             start_state_cache: vec![UNKNOWN_STATE_PTR; 1 << 5].into_boxed_slice(),
+            heap_usage: 0,
             state_cache: HashMap::new(),
             state_ids: Vec::new(),
+            next_state_count_per_state: 0,
             next_states: Vec::new(),
             current_threads: Threads::new(0),
             next_threads: Threads::new(0),
@@ -48,12 +50,22 @@ impl Dfa {
             self.current_threads = Threads::new(program.instrs.len());
             self.next_threads = Threads::new(program.instrs.len());
         }
+        if self.next_state_count_per_state != program.byte_classes.len() as usize {
+            for state in self.start_state_cache.iter_mut() {
+                *state = UNKNOWN_STATE_PTR;
+            }
+            self.state_cache.clear();
+            self.state_ids.clear();
+            self.next_state_count_per_state = program.byte_classes.len() as usize;
+            self.next_states.clear();
+        }
         RunContext {
             start_state_cache: &mut self.start_state_cache,
+            heap_usage: &mut self.heap_usage,
             state_cache: &mut self.state_cache,
             state_ids: &mut self.state_ids,
+            next_state_count_per_state: self.next_state_count_per_state,
             next_states: &mut self.next_states,
-            cache_size: &mut self.cache_size,
             current_threads: &mut self.current_threads,
             next_threads: &mut self.next_threads,
             stack: &mut self.stack,
@@ -84,10 +96,11 @@ impl error::Error for RunError {}
 
 struct RunContext<'a, C> {
     start_state_cache: &'a mut [StatePtr],
+    heap_usage: &'a mut usize,
     state_cache: &'a mut HashMap<StateId, StatePtr>,
     state_ids: &'a mut Vec<StateId>,
+    next_state_count_per_state: usize,
     next_states: &'a mut Vec<StatePtr>,
-    cache_size: &'a mut usize,
     current_threads: &'a mut Threads,
     next_threads: &'a mut Threads,
     stack: &'a mut Vec<InstrPtr>,
@@ -100,7 +113,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
     fn run(&mut self) -> Result<Option<usize>, RunError> {
         let mut matched = None;
         let mut current_state = UNKNOWN_STATE_PTR;
-        let mut next_state = self.get_or_create_start_state();
+        let mut next_state = self.get_or_create_start_state()?;
         while !self.cursor.is_at_end_of_text() {
             while next_state <= MAX_STATE_PTR && !self.cursor.is_at_end_of_text() {
                 current_state = next_state;
@@ -112,7 +125,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 let byte = self.cursor.prev_byte().unwrap();
                 self.cursor.next_byte().unwrap();
                 let byte_class = self.program.byte_classes.get(byte);
-                next_state = self.get_or_create_next_state(&mut current_state, Some(byte));
+                next_state = self.get_or_create_next_state(&mut current_state, Some(byte))?;
                 *self.next_state_mut(current_state, byte_class) = next_state;
             }
             if next_state & MATCHED_FLAG != 0 {
@@ -131,14 +144,14 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         }
         next_state &= MAX_STATE_PTR;
         current_state = next_state;
-        next_state = self.get_or_create_next_state(&mut current_state, None);
+        next_state = self.get_or_create_next_state(&mut current_state, None)?;
         if next_state & MATCHED_FLAG != 0 {
             matched = Some(self.cursor.byte_position());
         }
         Ok(matched)
     }
 
-    fn get_or_create_start_state(&mut self) -> StatePtr {
+    fn get_or_create_start_state(&mut self) -> Result<StatePtr, RunError> {
         use crate::CharExt;
 
         let prev_byte_is_ascii_word = self
@@ -155,7 +168,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             is_at_ascii_word_boundary: prev_byte_is_ascii_word != next_byte_is_ascii_word,
         };
         let bits = preds.to_bits() as usize;
-        match self.start_state_cache[bits] {
+        Ok(match self.start_state_cache[bits] {
             UNKNOWN_STATE_PTR => {
                 let mut flags = Flags::default();
                 self.current_threads.add_thread(
@@ -167,15 +180,19 @@ impl<'a, C: Cursor> RunContext<'a, C> {
                 );
                 let state_id = StateId::new(flags, self.current_threads.instrs.as_slice());
                 self.current_threads.instrs.clear();
-                let state = self.get_or_create_state(state_id, None);
+                let state = self.get_or_create_state(state_id, None)?;
                 self.start_state_cache[bits] = state;
                 state
             }
             state => state,
-        }
+        })
     }
 
-    fn get_or_create_next_state(&mut self, state: &mut StatePtr, byte: Option<u8>) -> StatePtr {
+    fn get_or_create_next_state(
+        &mut self,
+        state: &mut StatePtr,
+        byte: Option<u8>,
+    ) -> Result<StatePtr, RunError> {
         use {crate::CharExt, std::mem};
 
         let state_id = self.state_id(*state).clone();
@@ -188,9 +205,7 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             flags.set_prev_byte_is_ascii_word();
         }
         if state_id.flags.contains_assert() {
-            let prev_byte_is_ascii_word = self.state_id(*state)
-                .flags
-                .prev_byte_is_ascii_word();
+            let prev_byte_is_ascii_word = self.state_id(*state).flags.prev_byte_is_ascii_word();
             let preds = Preds {
                 is_at_end_of_text: byte.is_none(),
                 is_at_ascii_word_boundary: prev_byte_is_ascii_word != next_byte_is_ascii_word,
@@ -231,20 +246,20 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             }
         }
         if !flags.matched() && self.next_threads.instrs.is_empty() {
-            return DEAD_STATE_PTR;
+            return Ok(DEAD_STATE_PTR);
         }
         let next_state_id = StateId::new(flags, self.next_threads.instrs.as_slice());
         self.current_threads.instrs.clear();
         self.next_threads.instrs.clear();
-        let mut next_state = self.get_or_create_state(next_state_id, Some(state));
+        let mut next_state = self.get_or_create_state(next_state_id, Some(state))?;
         if flags.matched() {
             next_state |= MATCHED_FLAG;
         }
-        next_state
+        Ok(next_state)
     }
 
     fn state_id(&self, state: StatePtr) -> &StateId {
-        &self.state_ids[state as usize / self.program.byte_classes.len() as usize]
+        &self.state_ids[state as usize / self.next_state_count_per_state as usize]
     }
 
     fn next_state(&self, state: StatePtr, byte_class: u8) -> &StatePtr {
@@ -259,30 +274,30 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         &mut self,
         state_id: StateId,
         retained_state: Option<&mut StatePtr>,
-    ) -> StatePtr {
+    ) -> Result<StatePtr, RunError> {
         if let Some(&state) = self.state_cache.get(&state_id) {
-            return state;
+            return Ok(state);
         }
-        if *self.cache_size > 1024 {
+        if *self.heap_usage > 1024 * 1024 {
             match retained_state {
                 Some(retained_state) => {
                     let retained_state_id = self.state_id(*retained_state).clone();
-                    self.clear_cache();
+                    self.clear_state_cache()?;
                     *retained_state = self.create_state(retained_state_id);
                 }
-                None => self.clear_cache(),
+                None => self.clear_state_cache()?,
             }
         }
-        self.create_state(state_id)
+        Ok(self.create_state(state_id))
     }
 
     fn create_state(&mut self, state_id: StateId) -> StatePtr {
         use std::{iter, mem};
 
-        *self.cache_size += mem::size_of::<StateId>()
-            + state_id.bytes.len()    
+        *self.heap_usage += mem::size_of::<StateId>()
+            + state_id.bytes.len()
             + self.program.byte_classes.len() as usize * mem::size_of::<StatePtr>();
-        let state_ptr = self.next_states.len() as StatePtr;    
+        let state_ptr = self.next_states.len() as StatePtr;
         self.state_ids.push(state_id);
         self.next_states
             .extend(iter::repeat(UNKNOWN_STATE_PTR).take(self.program.byte_classes.len() as usize));
@@ -295,14 +310,15 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         state_ptr
     }
 
-    fn clear_cache(&mut self) {
+    fn clear_state_cache(&mut self) -> Result<(), RunError> {
         for state in self.start_state_cache.iter_mut() {
             *state = UNKNOWN_STATE_PTR;
         }
+        *self.heap_usage = 0;
         self.state_cache.clear();
         self.state_ids.clear();
         self.next_states.clear();
-        *self.cache_size = 0;
+        Ok(())
     }
 }
 
