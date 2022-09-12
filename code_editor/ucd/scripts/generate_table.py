@@ -41,12 +41,12 @@ def print_enumerated_property_table(name, property, default_value):
             entries.append([range[0], range[-1], value])
     entries.sort()
 
-    print("#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]")
+    print("#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]")
     print("#[repr(u8)]")
     print("pub enum %s {" % name.replace("_", ""))
-    print("    %s," % default_value.replace("_", ""))
     for value in sorted(property):
         print("    %s," % value.replace("_", ""))
+    print("    %s," % default_value.replace("_", ""))
     print("}")
     print("")
     print("impl Default for %s {" % name.replace("_", ""))

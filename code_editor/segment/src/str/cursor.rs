@@ -1,60 +1,61 @@
-use crate::cursor::char;
-
-/// A cursor over a `str`.
-///
-/// A `Cursor` is like an iterator, except that it can freely seek back-and-forth.
-pub struct Cursor<'a> {
+#[derive(Clone, Debug)]
+pub(super) struct Cursor<'a> {
     string: &'a str,
-    position: usize,
+    byte_position: usize,
 }
 
 impl<'a> Cursor<'a> {
-    pub(super) fn new(string: &'a str, position: usize) -> Self {
-        Self { string, position }
+    pub(super) fn front(string: &'a str) -> Self {
+        Self {
+            string,
+            byte_position: 0,
+        }
+    }
+
+    pub(super) fn back(string: &'a str) -> Self {
+        Self {
+            string,
+            byte_position: string.len(),
+        }
     }
 }
 
-impl<'a> char::Cursor for Cursor<'a> {
+impl<'a> crate::Cursor for Cursor<'a> {
     fn is_at_start(&self) -> bool {
-        self.position == 0
+        self.byte_position == 0
     }
 
     fn is_at_end(&self) -> bool {
-        self.position == self.string.len()
+        self.byte_position == self.string.len()
     }
 
-    fn is_at_boundary(&self) -> bool {
-        self.string.is_char_boundary(self.position)
+    fn is_at_char_boundary(&self) -> bool {
+        self.string.is_char_boundary(self.byte_position)
     }
 
-    fn position(&self) -> usize {
-        self.position
+    fn byte_position(&self) -> usize {
+        self.byte_position
     }
 
-    fn current(&self) -> char {
-        self.string[self.position..].chars().next().unwrap()
+    fn current_char(&self) -> Option<char> {
+        self.string[self.byte_position..].chars().next()
     }
 
-    fn move_next(&mut self) {
+    fn move_to(&mut self, byte_position: usize) {
+        assert!(byte_position <= self.string.len());
+        self.byte_position = byte_position;
+    }
+
+    fn move_next_char(&mut self) {
+        self.byte_position += super::utf8_char_width(self.string.as_bytes()[self.byte_position]);
+    }
+
+    fn move_prev_char(&mut self) {
         loop {
-            self.position += 1;
-            if self.is_at_boundary() {
+            self.byte_position -= 1;
+            if self.string.as_bytes()[self.byte_position] & 0xC0 != 0x80 {
                 break;
             }
         }
-    }
-
-    fn move_prev(&mut self) {
-        loop {
-            self.position -= 1;
-            if self.is_at_boundary() {
-                break;
-            }
-        }
-    }
-
-    fn set_position(&mut self, position: usize) {
-        assert!(position <= self.string.len());
-        self.position = position;
     }
 }
