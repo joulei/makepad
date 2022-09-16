@@ -281,7 +281,7 @@ impl Rope {
     ///
     /// Runs in O(log(n)) time.
     pub fn append(&mut self, mut other: Self) {
-        use crate::StrUtils;
+        use crate::StrExt;
 
         if self.is_empty() {
             *self = other;

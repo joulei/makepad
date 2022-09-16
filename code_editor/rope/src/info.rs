@@ -22,7 +22,7 @@ impl Info {
 
 impl<'a> From<&'a str> for Info {
     fn from(string: &str) -> Self {
-        use crate::StrUtils;
+        use crate::StrExt;
 
         Self {
             byte_count: string.len(),

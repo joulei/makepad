@@ -1,4 +1,4 @@
-pub trait StrUtils {
+pub trait StrExt {
     fn count_chars(&self) -> usize;
     fn count_line_breaks(&self) -> usize;
     fn last_is_cr(&self) -> bool;
@@ -8,7 +8,7 @@ pub trait StrUtils {
     fn line_to_byte(&self, line_index: usize) -> usize;
 }
 
-impl StrUtils for str {
+impl StrExt for str {
     fn count_chars(&self) -> usize {
         let mut count = 0;
         for byte in self.bytes() {
@@ -49,6 +49,16 @@ impl StrUtils for str {
 
     fn line_to_byte(&self, line_index: usize) -> usize {
         count_line_breaks_up_to(self, line_index).1
+    }
+}
+
+#[inline]
+pub fn utf8_char_width(byte: u8) -> usize {
+    match byte {
+        byte if byte < 0x80 => 1,
+        byte if byte < 0xe0 => 2,
+        byte if byte < 0xf0 => 3,
+        _ => 4,
     }
 }
 

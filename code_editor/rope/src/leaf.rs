@@ -56,7 +56,7 @@ impl Leaf {
     }
 
     fn distribute(&mut self, other: &mut Self) {
-        use {crate::StrUtils, std::cmp::Ordering};
+        use {crate::StrExt, std::cmp::Ordering};
 
         match self.len().cmp(&other.len()) {
             Ordering::Less => {

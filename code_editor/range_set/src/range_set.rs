@@ -16,7 +16,7 @@ impl<T> RangeSet<T> {
     ///
     /// Runs in O(1) time.
     pub fn new() -> Self {
-        Self { ranges: Vec::new() }
+        Self::default()
     }
 
     /// Creates a [`RangeSet`] from a sorted vector of [`Range`]s.
@@ -35,17 +35,6 @@ impl<T> RangeSet<T> {
         assert!(ranges.windows(2).all(|chunk| chunk[0].end < chunk[1].start));
         Self {
             ranges
-        }
-    }
-
-    /// Constructs a new, empty `RangeSet` with at least the given `capacity`.
-    ///
-    /// # Performance
-    ///
-    /// Runs in O(1) time.
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            ranges: Vec::with_capacity(capacity),
         }
     }
 
@@ -110,16 +99,16 @@ impl<T> RangeSet<T> {
         }
     }
 
-    /// Returns an iterator that yields the [`Range`]s in the difference of `self` and `other`.
+    /// Returns an iterator that yields the [`Range`]s in the union of `self` and `other`.
     ///
     /// # Performance
     ///
     /// Runs in O(1) time.
-    pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, T>
+    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, T>
     where
         T: Clone + Ord,
     {
-        Difference::new(&self.ranges, &other.ranges)
+        Union::new(&self.ranges, &other.ranges)
     }
 
     /// Returns an iterator that yields the [`Range`]s in the intersection of `self` and `other`.
@@ -134,6 +123,18 @@ impl<T> RangeSet<T> {
         Intersection::new(&self.ranges, &other.ranges)
     }
 
+    /// Returns an iterator that yields the [`Range`]s in the difference of `self` and `other`.
+    ///
+    /// # Performance
+    ///
+    /// Runs in O(1) time.
+    pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, T>
+    where
+        T: Clone + Ord,
+    {
+        Difference::new(&self.ranges, &other.ranges)
+    }
+
     /// Returns an iterator that yields the [`Range`]s in the symmetric difference of `self` and
     /// `other`.
     ///
@@ -145,18 +146,6 @@ impl<T> RangeSet<T> {
         T: Clone + Ord,
     {
         SymmetricDifference::new(&self.ranges, &other.ranges)
-    }
-
-    /// Returns an iterator that yields the [`Range`]s in the union of `self` and `other`.
-    ///
-    /// # Performance
-    ///
-    /// Runs in O(1) time.
-    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, T>
-    where
-        T: Clone + Ord,
-    {
-        Union::new(&self.ranges, &other.ranges)
     }
 
     /// Adds the given `range` to `self`.
@@ -233,7 +222,9 @@ impl<T> RangeSet<T> {
 
 impl<T> Default for RangeSet<T> {
     fn default() -> Self {
-        Self::new()
+        Self {
+            ranges: Vec::default()
+        }
     }
 }
 

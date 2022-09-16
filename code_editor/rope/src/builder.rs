@@ -25,7 +25,7 @@ impl Builder {
     ///
     /// Runs in O(1) amortized and O(log(n)) worst-case time.
     pub fn push_str(&mut self, mut string: &str) {
-        use crate::StrUtils;
+        use crate::StrExt;
 
         while !string.is_empty() {
             if string.len() <= Leaf::MAX_LEN - self.chunk.len() {

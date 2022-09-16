@@ -1,31 +1,14 @@
-use crate::CharClass;
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Ast {
     Empty,
     Char(char),
-    CharClass(CharClass),
-    Capture(Box<Ast>, usize),
-    Assert(Pred),
-    Rep(Box<Ast>, Quant),
-    Cat(Vec<Ast>),
-    Alt(Vec<Ast>),
+    Rep(Box<Ast>, Quant, bool),
+    Cat(Box<Ast>, Box<Ast>),
+    Alt(Box<Ast>, Box<Ast>),
 }
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum Pred {
-    IsAtStartOfText,
-    IsAtEndOfText,
-    IsAtStartOfLine,
-    IsAtEndOfLine,
-    IsAtWordBoundary,
-    IsNotAtWordBoundary,
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Quant {
-    Quest(bool),
-    Star(bool),
-    Plus(bool),
-    Counted(u32, Option<u32>, bool),
+    Quest,
+    Star,
+    Plus,
 }

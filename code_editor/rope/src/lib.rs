@@ -13,7 +13,7 @@ mod leaf;
 mod node;
 mod rope;
 mod slice;
-mod str_utils;
+mod str;
 
 pub use self::{
     builder::Builder, bytes::Bytes, bytes_rev::BytesRev, chars::Chars, chars_rev::CharsRev,
@@ -22,7 +22,7 @@ pub use self::{
 };
 
 use {
-    self::{branch::Branch, info::Info, leaf::Leaf, node::Node, str_utils::StrUtils},
+    self::{branch::Branch, info::Info, leaf::Leaf, node::Node, str::StrExt},
     std::ops::{Range, RangeBounds},
 };
 

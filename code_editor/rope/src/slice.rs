@@ -296,7 +296,7 @@ impl<'a> Slice<'a> {
     }
 
     pub(crate) fn new(rope: &'a Rope, byte_start: usize, byte_end: usize) -> Self {
-        use crate::StrUtils;
+        use crate::StrExt;
 
         let start_info = if byte_start == 0 {
             Info::new()

@@ -32,14 +32,14 @@ impl Node {
     }
 
     pub(crate) fn char_to_byte(&self, char_index: usize) -> usize {
-        use crate::StrUtils;
+        use crate::StrExt;
 
         let (chunk, start_info) = self.chunk_at_char(char_index);
         start_info.byte_count + chunk.char_to_byte(char_index - start_info.char_count)
     }
 
     pub(crate) fn line_to_byte(&self, line_index: usize) -> usize {
-        use crate::StrUtils;
+        use crate::StrExt;
 
         let (chunk, start_info) = self.chunk_at_line(line_index);
         start_info.byte_count + chunk.line_to_byte(line_index - start_info.line_break_count)

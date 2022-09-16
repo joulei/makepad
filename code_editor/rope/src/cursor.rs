@@ -1,4 +1,4 @@
-use crate::{ChunkCursor, Slice};
+use crate::{str, ChunkCursor, Slice};
 
 /// A cursor over a [`Rope`] or [`Slice`].
 /// 
@@ -141,7 +141,7 @@ impl<'a> Cursor<'a> {
     #[inline]
     pub fn move_next_char(&mut self) {
         assert!(!self.is_at_back());
-        self.byte_index += utf8_char_width(self.chunk.as_bytes()[self.byte_index]);
+        self.byte_index += str::utf8_char_width(self.chunk.as_bytes()[self.byte_index]);
         if self.byte_index == self.chunk.len() && !self.chunk_cursor.is_at_back() {
             self.move_next();
         }
@@ -231,15 +231,5 @@ impl<'a> Cursor<'a> {
         self.chunk_cursor.move_prev();
         self.chunk = self.chunk_cursor.current();
         self.byte_index = self.chunk.len();
-    }
-}
-
-#[inline]
-fn utf8_char_width(byte: u8) -> usize {
-    match byte {
-        byte if byte < 0x80 => 1,
-        byte if byte < 0xe0 => 2,
-        byte if byte < 0xf0 => 3,
-        _ => 4,
     }
 }
