@@ -3,7 +3,6 @@
 members = [
     "code_editor/regex",
     "code_editor/rope",
-    "code_editor/sparse_set",
     "code_editor/varint",
     "examples/numbers", 
     "examples/fractal_zoom", 
