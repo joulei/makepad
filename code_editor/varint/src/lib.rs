@@ -51,15 +51,15 @@ macro_rules! read_varuint {
     }
 }
 
-/// Extends `Read` with methods to read variable-length integers.
+/// Extends [`Read`] with methods to read variable-length integers.
 pub trait ReadVarint: Read {
     read_varsint! {
         /// Reads a signed 8-bit variable-length integer from the underlying reader.
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_vari8(i8, read_varu8);
 
@@ -67,8 +67,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_vari16(i16, read_varu16);
 
@@ -76,8 +76,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_vari32(i32, read_varu32);
 
@@ -85,8 +85,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_vari64(i64, read_varu64);
 
@@ -94,8 +94,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_vari128(i128, read_varu128);
     }
@@ -105,8 +105,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_varu8(u8);
 
@@ -114,8 +114,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_varu16(u16);
 
@@ -123,8 +123,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_varu32(u32);
 
@@ -132,8 +132,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns ]`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_varu64(u64);
 
@@ -141,8 +141,8 @@ pub trait ReadVarint: Read {
         ///
         /// # Errors
         ///
-        /// Returns `ReadVarintError::Io` if the underlying reader returned an error, or
-        /// `ReadVarintError::Overflow` if the integer is too large to store in the target integer
+        /// Returns [`ReadVarintError::Io`] if the underlying reader returned an error, or
+        /// [`ReadVarintError::Overflow`] if the integer is too large to store in the target integer
         /// type.
         fn read_varu128(u128);
     }
@@ -217,7 +217,7 @@ macro_rules! write_varuint {
     }
 }
 
-/// Extends `Write` with methods to write variable-length integers.
+/// Extends [`Write`] with methods to write variable-length integers.
 pub trait WriteVarint: Write {
     write_varsint! {
         /// Writes a signed 8-bit variable-length integer to the underlying writer.
