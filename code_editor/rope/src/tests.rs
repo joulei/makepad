@@ -6,7 +6,6 @@ fn test_builder() {
     builder.push_str("abcdefg\r");
     builder.push_str("\nabcdefg");
     let rope = builder.build();
-    println!("{:?}", rope);
     assert_eq!(rope.line_len(), 2);
 }
 
