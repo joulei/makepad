@@ -17,6 +17,7 @@ impl Program {
 pub(crate) enum Instr {
     Match,
     ByteRange(Range<u8>, InstrPtr),
+    Char(char, InstrPtr),
     Assert(Predicate, InstrPtr),
     Split(InstrPtr, InstrPtr),
 }

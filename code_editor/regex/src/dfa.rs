@@ -15,50 +15,50 @@ const ERROR_STATE_PTR: StatePtr = (1 << 31) + 2;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Dfa {
-    program: Rc<Program>,
     start_state_cache: Box<[StatePtr]>,
     state_cache: HashMap<State, StatePtr>,
     states: Vec<State>,
     transitions: Vec<StatePtr>,
-    heap_usage: usize,
     current_threads: SparseSet,
     next_threads: SparseSet,
+    total_state_size: usize,
     add_thread_stack: Vec<InstrPtr>,
 }
 
 impl Dfa {
-    pub(crate) fn new(program: Program) -> Self {
-        let max_thread_count = program.instrs.len();
+    pub(crate) fn new(program: &Program) -> Self {
         Self {
-            program: Rc::new(program),
             start_state_cache: vec![UNKNOWN_STATE_PTR; 1 << 5].into_boxed_slice(),
             state_cache: HashMap::new(),
             states: Vec::new(),
             transitions: Vec::new(),
-            heap_usage: 0,
-            current_threads: SparseSet::new(max_thread_count),
-            next_threads: SparseSet::new(max_thread_count),
+            current_threads: SparseSet::new(program.instrs.len()),
+            next_threads: SparseSet::new(program.instrs.len()),
+            total_state_size: 0,
             add_thread_stack: Vec::new(),
         }
     }
 
     pub(crate) fn run<C: Cursor>(
         &mut self,
+        program: &Program,
         cursor: C,
         options: Options,
     ) -> Result<Option<usize>, RunError> {
+        let last_clear = cursor.byte_position();
         RunContext {
-            program: &self.program,
             start_state_cache: &mut self.start_state_cache,
             state_cache: &mut self.state_cache,
             states: &mut self.states,
             transitions: &mut self.transitions,
-            heap_usage: &mut self.heap_usage,
             current_threads: &mut self.current_threads,
             next_threads: &mut self.next_threads,
+            total_state_size: &mut self.total_state_size,
             add_thread_stack: &mut self.add_thread_stack,
+            program,
             cursor,
             options,
+            last_clear,
         }
         .run()
     }
@@ -66,7 +66,9 @@ impl Dfa {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Options {
-    max_heap_usage: usize,
+    stop_after_first_match: bool,
+    continue_after_leftmost_match: bool,
+    max_size: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -75,24 +77,27 @@ pub(crate) struct RunError;
 impl Default for Options {
     fn default() -> Self {
         Self {
-            max_heap_usage: 1 << 20,
+            stop_after_first_match: false,
+            continue_after_leftmost_match: false,
+            max_size: 1 << 20,
         }
     }
 }
 
 #[derive(Debug)]
 struct RunContext<'a, C> {
-    program: &'a Program,
     start_state_cache: &'a mut Box<[StatePtr]>,
     state_cache: &'a mut HashMap<State, StatePtr>,
     states: &'a mut Vec<State>,
     transitions: &'a mut Vec<StatePtr>,
-    heap_usage: &'a mut usize,
     current_threads: &'a mut SparseSet,
     next_threads: &'a mut SparseSet,
+    total_state_size: &'a mut usize,
     add_thread_stack: &'a mut Vec<InstrPtr>,
+    program: &'a Program,
     cursor: C,
     options: Options,
+    last_clear: usize,
 }
 
 impl<'a, C: Cursor> RunContext<'a, C> {
@@ -116,6 +121,9 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             }
             if next_state_ptr & MATCHING_STATE_FLAG != 0 {
                 last_match = Some(self.cursor.byte_position() - 1);
+                if self.options.stop_after_first_match {
+                    return Ok(last_match);
+                }
                 next_state_ptr &= !MATCHING_STATE_FLAG;
             }
             if next_state_ptr == DEAD_STATE_PTR {
@@ -139,6 +147,17 @@ impl<'a, C: Cursor> RunContext<'a, C> {
 
     fn transition(&self, state: StatePtr, byte_class: u8) -> &StatePtr {
         &self.transitions[state as usize + byte_class as usize]
+    }
+
+    fn size(&self) -> usize {
+        use std::mem;
+
+        self.start_state_cache.len() * mem::size_of::<StatePtr>()
+            + self.state_cache.len() * (mem::size_of::<State>() + mem::size_of::<StatePtr>())
+            + self.states.len() * mem::size_of::<State>()
+            + self.transitions.len() * mem::size_of::<StatePtr>()
+            + 2 * self.program.instrs.len() * mem::size_of::<usize>()
+            + *self.total_state_size
     }
 
     fn transition_mut(&mut self, state: StatePtr, byte_class: u8) -> &mut StatePtr {
@@ -237,7 +256,9 @@ impl<'a, C: Cursor> RunContext<'a, C> {
             match self.program.instrs[instr] {
                 Instr::Match => {
                     next_state_flags.set_is_matching();
-                    break;
+                    if !self.options.continue_after_leftmost_match {
+                        break;
+                    }
                 }
                 Instr::ByteRange(byte_range, to) => {
                     if byte.map_or(false, |byte| byte_range.contains(&byte)) {
@@ -275,42 +296,44 @@ impl<'a, C: Cursor> RunContext<'a, C> {
         if let Some(&state_ptr) = self.state_cache.get(&state) {
             return Ok(state_ptr);
         }
-        if *self.heap_usage > self.options.max_heap_usage {
+        if self.size() > self.options.max_size {
             match retained_state_ptr {
                 Some(retained_state_ptr) => {
                     let retained_state = self.state(*retained_state_ptr).clone();
-                    self.flush_cache()?;
+                    self.clear()?;
                     *retained_state_ptr = self.add_state(retained_state);
                 }
-                None => self.flush_cache()?,
+                None => self.clear()?,
             }
         }
         let state_ptr = self.add_state(state.clone());
+        let state_size = state.size();
         self.state_cache.insert(state, state_ptr);
         Ok(state_ptr)
     }
 
     fn add_state(&mut self, state: State) -> StatePtr {
-        use std::{iter, mem};
+        use std::iter;
 
         let state_ptr = self.states.len() as u32;
         let state_size = state.size();
         self.states.push(state);
         self.transitions
             .extend(iter::repeat(UNKNOWN_STATE_PTR).take(self.program.byte_class_count()));
-        *self.heap_usage +=
-            state_size + self.program.byte_class_count() * mem::size_of::<StatePtr>();
+        *self.total_state_size += state_size;
         state_ptr
     }
 
-    fn flush_cache(&mut self) -> Result<(), RunError> {
+    fn clear(&mut self) -> Result<(), RunError> {
+        if self.cursor.byte_position() - self.last_clear < 10 * self.states.len() {
+            return Err(RunError);
+        }
         for state_ptr in self.start_state_cache.iter_mut() {
             *state_ptr = UNKNOWN_STATE_PTR;
         }
         self.state_cache.clear();
         self.states.clear();
         self.transitions.clear();
-        *self.heap_usage = 0;
         Ok(())
     }
 }
