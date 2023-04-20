@@ -17,7 +17,7 @@ pub struct Document {
 
 impl Document {
     pub fn new(
-        spawner: &mut Spawner,
+        spawner: &Spawner,
         load: impl Future<Output = Text> + 'static,
     ) -> Rc<RefCell<Self>> {
         let document = Rc::new(RefCell::new(Self {
