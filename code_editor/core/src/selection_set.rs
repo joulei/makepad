@@ -98,6 +98,12 @@ impl Extend<Selection> for SelectionSet {
     }
 }
 
+impl<const N: usize> From<[Selection; N]> for SelectionSet {
+    fn from(array: [Selection; N]) -> Self {
+        array.into_iter().collect()
+    }
+}
+
 impl FromIterator<Selection> for SelectionSet {
     fn from_iter<I>(iter: I) -> Self
     where

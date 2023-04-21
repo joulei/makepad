@@ -5,8 +5,8 @@ use {
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Position {
-    pub line: usize,
-    pub byte: usize,
+    pub line_index: usize,
+    pub byte_index: usize,
 }
 
 impl Position {
@@ -25,15 +25,15 @@ impl Add<Size> for Position {
     type Output = Self;
 
     fn add(self, size: Size) -> Self::Output {
-        if size.line == 0 {
+        if size.line_count == 0 {
             Self {
-                line: self.line,
-                byte: self.byte + size.byte,
+                line_index: self.line_index,
+                byte_index: self.byte_index + size.byte_count,
             }
         } else {
             Self {
-                line: self.line + size.line,
-                byte: size.byte,
+                line_index: self.line_index + size.line_count,
+                byte_index: size.byte_count,
             }
         }
     }
@@ -49,15 +49,15 @@ impl Sub for Position {
     type Output = Size;
 
     fn sub(self, other: Self) -> Self::Output {
-        if self.line == other.line {
+        if self.line_index == other.line_index {
             Size {
-                line: 0,
-                byte: other.byte - self.byte,
+                line_count: 0,
+                byte_count: other.byte_index - self.byte_index,
             }
         } else {
             Size {
-                line: other.line - self.line,
-                byte: other.byte,
+                line_count: other.line_index - self.line_index,
+                byte_count: other.byte_index,
             }
         }
     }

@@ -1,5 +1,5 @@
 use {
-    crate::{Session, Text, WeakPtrEq},
+    crate::{Session, Text, rc::WeakPtrEq},
     makepad_futures::executor::Spawner,
     std::{
         cell::RefCell,
@@ -16,10 +16,7 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new(
-        spawner: &Spawner,
-        load: impl Future<Output = Text> + 'static,
-    ) -> Rc<RefCell<Self>> {
+    pub fn new(spawner: &Spawner, load: impl Future<Output = Text> + 'static) -> Rc<RefCell<Self>> {
         let document = Rc::new(RefCell::new(Self {
             sessions: HashSet::new(),
             text: ["Loading...".into()].into(),

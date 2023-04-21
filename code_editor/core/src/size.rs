@@ -2,23 +2,23 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Size {
-    pub line: usize,
-    pub byte: usize,
+    pub line_count: usize,
+    pub byte_count: usize,
 }
 
 impl Add for Size {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        if other.line == 0 {
+        if other.line_count == 0 {
             Self {
-                line: self.line,
-                byte: self.byte + other.byte,
+                line_count: self.line_count,
+                byte_count: self.byte_count + other.byte_count,
             }
         } else {
             Self {
-                line: self.line + other.line,
-                byte: other.byte,
+                line_count: self.line_count + other.line_count,
+                byte_count: other.byte_count,
             }
         }
     }
@@ -34,15 +34,15 @@ impl Sub for Size {
     type Output = Size;
 
     fn sub(self, other: Self) -> Self::Output {
-        if self.line == other.line {
+        if self.line_count == other.line_count {
             Self {
-                line: 0,
-                byte: other.byte - self.byte,
+                line_count: 0,
+                byte_count: other.byte_count - self.byte_count,
             }
         } else {
             Self {
-                line: other.line - self.line,
-                byte: other.byte,
+                line_count: other.line_count - self.line_count,
+                byte_count: other.byte_count,
             }
         }
     }

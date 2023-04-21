@@ -11,8 +11,16 @@ pub struct Session {
 
 impl Session {
     pub fn new(document: Rc<RefCell<Document>>) -> Rc<RefCell<Self>> {
+        use crate::{Position, Selection};
+
         let session = Rc::new(RefCell::new(Self {
-            selections: SelectionSet::new(),
+            selections: [Selection {
+                cursor: Position {
+                    line_index: 12,
+                    byte_index: 0,
+                },
+                anchor: Position::default(),
+            }].into(),
             document: document.clone(),
         }));
         document

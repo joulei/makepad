@@ -1,13 +1,13 @@
 use {
     crate::{code_editor, code_editor::CodeEditor},
-    std::{cell::RefCell, rc::Rc},
     makepad_code_editor_core::{Document, Session},
     makepad_widgets::*,
+    std::{cell::RefCell, rc::Rc},
 };
 
 live_design! {
     import makepad_widgets::desktop_window::DesktopWindow;
-    
+
     App = {{App}} {
         ui: <DesktopWindow> {
             frame: {
@@ -52,14 +52,23 @@ struct AppState {
 
 impl AppState {
     pub fn new(cx: &mut Cx) -> Self {
-        use {makepad_code_editor_core::Text, makepad_futures::channel::oneshot, std::{thread, time::Duration}};
+        use {
+            makepad_code_editor_core::Text,
+            makepad_futures::channel::oneshot,
+            std::{thread, time::Duration},
+        };
 
         let (sender, receiver) = oneshot::channel();
-        thread::spawn(move|| {
-            thread::sleep(Duration::from_secs(3));
-            sender.send(Text::from([
-                "Hello, world!".into()
-            ])).unwrap();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(0));
+            sender
+                .send(Text::from(
+                    include_str!("code_editor.rs")
+                        .lines()
+                        .map(|string| string.to_owned())
+                        .collect::<Vec<_>>(),
+                ))
+                .unwrap();
         });
         let document = Document::new(cx.spawner(), {
             let cx = cx.get_ref().0;

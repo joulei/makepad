@@ -19,8 +19,8 @@ impl Text {
 
     pub fn len(&self) -> Size {
         Size {
-            line: self.lines.len() - 1,
-            byte: self.lines.last().unwrap().len(),
+            line_count: self.lines.len() - 1,
+            byte_count: self.lines.last().unwrap().len(),
         }
     }
 
@@ -31,16 +31,16 @@ impl Text {
     pub fn apply_delta(&mut self, mut delta: Delta) {
         delta.replace_with.lines.first_mut().unwrap().replace_range(
             ..0,
-            &self.lines[delta.range.start().line][..delta.range.start().byte],
+            &self.lines[delta.range.start().line_index][..delta.range.start().byte_index],
         );
         delta
             .replace_with
             .lines
             .last_mut()
             .unwrap()
-            .push_str(&self.lines[delta.range.end().line][delta.range.end().byte..]);
+            .push_str(&self.lines[delta.range.end().line_index][delta.range.end().byte_index..]);
         self.lines.splice(
-            delta.range.start().line..=delta.range.end().line,
+            delta.range.start().line_index..=delta.range.end().line_index,
             delta.replace_with.lines,
         );
     }
