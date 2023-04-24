@@ -36,39 +36,48 @@ live_design! {
     }
 
     CodeEditor = {{CodeEditor}} {
-        draw_text: {
+        draw_grapheme: {
+            draw_depth: 0.0,
             text_style: <FONT_CODE> {}
+        }
+        draw_selection: {
+            draw_depth: 1.0,
+        }
+        draw_caret: {
+            draw_depth: 2.0,
+            color: #f00
         }
     }
 }
 
 #[derive(Live, LiveHook)]
 pub struct CodeEditor {
-    draw_text: DrawText,
+    draw_grapheme: DrawText,
     draw_selection: DrawSelection,
+    draw_caret: DrawColor,
 }
 
 impl CodeEditor {
     pub fn draw(&mut self, cx: &mut Cx2d, session: &Session) {
-        use makepad_code_editor_core::{layout, layout::Element};
+        use makepad_code_editor_core::{layout, layout::Event};
 
         let DVec2 {
             x: column_width,
             y: row_height,
-        } = self.draw_text.text_style.font_size * self.draw_text.get_monospace_base(cx);
+        } = self.draw_grapheme.text_style.font_size * self.draw_grapheme.get_monospace_base(cx);
         layout::layout(
             session.document().borrow().text(),
-            &session.selections(),
+            &session.cursors(),
             |layout_position, element| {
                 let screen_position = DVec2 {
                     x: layout_position.column_index as f64 * column_width,
                     y: layout_position.row_index as f64 * row_height,
                 };
                 match element {
-                    Element::Grapheme(grapheme) => {
-                        self.draw_text.draw_abs(cx, screen_position, grapheme);
+                    Event::Grapheme(grapheme) => {
+                        self.draw_grapheme.draw_abs(cx, screen_position, grapheme);
                     }
-                    Element::Selection(column_count) => {
+                    Event::SelectionFragment(column_count) => {
                         self.draw_selection.draw(
                             cx,
                             Some(Rect {
@@ -78,6 +87,21 @@ impl CodeEditor {
                                     y: row_height,
                                 },
                             }),
+                        );
+                    }
+                    Event::SelectionEnd => {
+                        self.draw_selection.draw(cx, None);
+                    }
+                    Event::Caret => {
+                        self.draw_caret.draw_abs(
+                            cx,
+                            Rect {
+                                pos: screen_position,
+                                size: DVec2 {
+                                    x: 2.0,
+                                    y: row_height,
+                                },
+                            },
                         );
                     }
                 }
@@ -106,7 +130,6 @@ pub struct DrawSelection {
 
 impl DrawSelection {
     fn draw(&mut self, cx: &mut Cx2d, next_rect: Option<Rect>) {
-        self.draw_depth = 2.0;
         if let Some(rect) = self.rect {
             if let Some(prev_rect) = self.prev_rect {
                 self.prev_x = prev_rect.pos.x as f32;

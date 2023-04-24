@@ -1,5 +1,5 @@
 use {
-    crate::{rc::WeakPtrEq, Session, Text},
+    crate::{rc::WeakPtrEq, text::Text, Session},
     makepad_futures::executor::Spawner,
     std::{
         cell::RefCell,

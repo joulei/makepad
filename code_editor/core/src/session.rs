@@ -1,25 +1,32 @@
 use {
-    crate::{Document, SelectionSet},
+    crate::{cursor::CursorSet, Document},
     std::{cell::RefCell, rc::Rc},
 };
 
 #[derive(Debug)]
 pub struct Session {
-    selections: SelectionSet,
+    cursors: CursorSet,
     document: Rc<RefCell<Document>>,
 }
 
 impl Session {
     pub fn new(document: Rc<RefCell<Document>>) -> Rc<RefCell<Self>> {
-        use crate::{text::Position, Selection};
+        use crate::{
+            cursor,
+            cursor::{Affinity, Cursor},
+            text,
+        };
 
         let session = Rc::new(RefCell::new(Self {
-            selections: [Selection {
-                cursor: Position {
-                    line_index: 12,
-                    byte_index: 0,
+            cursors: [Cursor {
+                caret: cursor::Position {
+                    position: text::Position {
+                        line_index: 12,
+                        byte_index: 20,
+                    },
+                    affinity: Affinity::default(),
                 },
-                anchor: Position::default(),
+                anchor: cursor::Position::default(),
             }]
             .into(),
             document: document.clone(),
@@ -34,7 +41,7 @@ impl Session {
         &self.document
     }
 
-    pub fn selections(&self) -> &SelectionSet {
-        &self.selections
+    pub fn cursors(&self) -> &CursorSet {
+        &self.cursors
     }
 }

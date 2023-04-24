@@ -5,6 +5,7 @@ pub use self::{grapheme_indices::GraphemeIndices, graphemes::Graphemes};
 
 pub trait StrExt {
     fn is_grapheme_boundary(&self, index: usize) -> bool;
+    fn column_count(&self) -> usize;
     fn next_grapheme_boundary(&self, index: usize) -> Option<usize>;
     fn prev_grapheme_boundary(&self, index: usize) -> Option<usize>;
     fn graphemes(&self) -> Graphemes<'_>;
@@ -14,6 +15,12 @@ pub trait StrExt {
 impl StrExt for str {
     fn is_grapheme_boundary(&self, index: usize) -> bool {
         self.is_char_boundary(index)
+    }
+
+    fn column_count(&self) -> usize {
+        use crate::char::CharExt;
+
+        self.chars().map(|char| char.column_count()).sum::<usize>()
     }
 
     fn next_grapheme_boundary(&self, mut index: usize) -> Option<usize> {

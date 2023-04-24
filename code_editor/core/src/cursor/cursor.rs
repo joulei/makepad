@@ -1,35 +1,27 @@
-use crate::text::{DeltaLen, Position, Range, Size};
+use {super::Position, crate::text::DeltaLen};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Selection {
-    pub cursor: Position,
+pub struct Cursor {
+    pub caret: Position,
     pub anchor: Position,
 }
 
-impl Selection {
+impl Cursor {
     pub fn is_empty(self) -> bool {
-        self.cursor == self.anchor
-    }
-
-    pub fn len(self) -> Size {
-        self.end() - self.start()
+        self.caret == self.anchor
     }
 
     pub fn start(self) -> Position {
-        self.cursor.min(self.anchor)
+        self.caret.min(self.anchor)
     }
 
     pub fn end(self) -> Position {
-        self.cursor.max(self.anchor)
-    }
-
-    pub fn range(self) -> Range {
-        Range::new(self.start(), self.end())
+        self.caret.max(self.anchor)
     }
 
     pub fn apply_delta(self, delta_len: DeltaLen) -> Self {
         Self {
-            cursor: self.cursor.apply_delta(delta_len),
+            caret: self.caret.apply_delta(delta_len),
             anchor: self.anchor.apply_delta(delta_len),
         }
     }
@@ -41,17 +33,17 @@ impl Selection {
             mem::swap(&mut self, &mut other);
         }
         match (self.is_empty(), other.is_empty()) {
-            (true, true) if self.cursor == other.cursor => Some(self),
-            (false, true) if other.cursor <= self.end() => Some(self),
-            (true, false) if self.cursor == other.start() => Some(other),
-            (false, false) if self.end() > other.start() => {
-                Some(match self.cursor.cmp(&self.anchor) {
+            (true, true) if self.caret.position == other.caret.position => Some(self),
+            (false, true) if other.caret.position <= self.end().position => Some(self),
+            (true, false) if self.caret.position == other.start().position => Some(other),
+            (false, false) if self.end().position > other.start().position => {
+                Some(match self.caret.cmp(&self.anchor) {
                     Ordering::Less => Self {
-                        cursor: self.cursor.min(other.cursor),
+                        caret: self.caret.min(other.caret),
                         anchor: self.anchor.max(other.anchor),
                     },
                     Ordering::Greater => Self {
-                        cursor: self.cursor.max(other.cursor),
+                        caret: self.caret.max(other.caret),
                         anchor: self.anchor.min(other.anchor),
                     },
                     Ordering::Equal => unreachable!(),

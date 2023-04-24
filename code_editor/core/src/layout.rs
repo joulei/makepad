@@ -1,8 +1,6 @@
 pub use {
     crate::{
-        selection::Selection,
-        selection_set,
-        selection_set::SelectionSet,
+        cursor::{cursor_set, Cursor, CursorSet},
         {
             text,
             text::{Range, Text},
@@ -18,34 +16,36 @@ pub struct Position {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Element<'a> {
+pub enum Event<'a> {
     Grapheme(&'a str),
-    Selection(usize),
+    SelectionFragment(usize),
+    SelectionEnd,
+    Caret,
 }
 
 struct Layouter<'a, F> {
     text_position: text::Position,
     position: Position,
-    active_selection: Option<ActiveSelection>,
-    selections: Peekable<selection_set::Iter<'a>>,
-    f: F,
+    active_cursor: Option<ActiveCursor>,
+    cursors: Peekable<cursor_set::Iter<'a>>,
+    handle_event: F,
 }
 
 impl<'a, F> Layouter<'a, F> {
-    fn new(selections: &'a SelectionSet, f: F) -> Self {
+    fn new(cursors: &'a CursorSet, f: F) -> Self {
         Self {
             text_position: text::Position::default(),
             position: Position::default(),
-            active_selection: None,
-            selections: selections.iter().peekable(),
-            f,
+            active_cursor: None,
+            cursors: cursors.iter().peekable(),
+            handle_event: f,
         }
     }
 }
 
 impl<'a, F> Layouter<'a, F>
 where
-    F: FnMut(Position, Element<'a>),
+    F: FnMut(Position, Event<'a>),
 {
     fn layout(&mut self, text: &'a Text) {
         for line in text.as_lines().iter() {
@@ -54,80 +54,147 @@ where
     }
 
     fn layout_line(&mut self, line: &'a str) {
-        use crate::str::StrExt;
-
-        for grapheme in line.graphemes() {
-            self.handle_grapheme_boundary();
-            self.layout_grapheme(grapheme);
-        }
-        self.handle_grapheme_boundary();
-        if let Some(&selection) = self.active_selection.as_ref() {
-            self.layout_selection(selection);
-        }
+        self.handle_line_start();
+        self.layout_virtual_line(line);
+        self.handle_line_end();
         self.text_position.line_index += 1;
         self.text_position.byte_index = 0;
+    }
+
+    fn layout_virtual_line(&mut self, virtual_line: &'a str) {
+        use crate::str::StrExt;
+
+        self.handle_virtual_line_start();
+        for grapheme in virtual_line.graphemes() {
+            self.handle_grapheme_start();
+            self.layout_grapheme(grapheme);
+            self.handle_grapheme_end();
+        }
+        self.handle_virtual_line_end();
         self.position.row_index += 1;
         self.position.column_index = 0;
     }
 
     fn layout_grapheme(&mut self, grapheme: &'a str) {
-        use crate::char::CharExt;
+        use crate::str::StrExt;
 
-        (self.f)(self.position, Element::Grapheme(grapheme));
+        self.dispatch_event(self.position, Event::Grapheme(grapheme));
         self.text_position.byte_index += grapheme.len();
-        self.position.column_index += grapheme
-            .chars()
-            .map(|char| char.column_count())
-            .sum::<usize>();
+        self.position.column_index += grapheme.column_count();
     }
 
-    fn handle_grapheme_boundary(&mut self) {
-        if let Some(selection) = &self.active_selection {
-            if selection.end == self.text_position {
-                let selection = self.active_selection.take().unwrap();
-                self.layout_selection(selection);
-            }
-        }
-        if let Some(&selection) = self.selections.peek() {
-            if selection.start() == self.text_position {
-                let selection = self.selections.next().unwrap();
-                self.active_selection = Some(ActiveSelection {
-                    start_line_index: selection.start().line_index,
-                    end: selection.end(),
-                    start_column_index: self.position.column_index,
-                });
+    fn handle_line_start(&mut self) {
+        if let Some(cursor) = &self.active_cursor {
+            if cursor.cursor.end().is_right_before(self.text_position) {
+                self.handle_cursor_end();
             }
         }
     }
 
-    fn layout_selection(&mut self, selection: ActiveSelection) {
-        let start_column_index = if selection.start_line_index == self.text_position.line_index {
-            selection.start_column_index
-        } else {
-            0
-        };
-        (self.f)(
+    fn handle_line_end(&mut self) {
+        if let Some(&cursor) = self.cursors.peek() {
+            if cursor.start().is_right_after(self.text_position) {
+                self.handle_cursor_start();
+            }
+        }
+    }
+
+    fn handle_virtual_line_start(&mut self) {}
+
+    fn handle_virtual_line_end(&mut self) {
+        if let Some(&active_cursor) = self.active_cursor.as_ref() {
+            self.layout_cursor(active_cursor);
+        }
+    }
+
+    fn handle_grapheme_start(&mut self) {
+        if let Some(active_cursor) = &self.active_cursor {
+            if active_cursor
+                .cursor
+                .end()
+                .is_right_after(self.text_position)
+            {
+                self.handle_cursor_end();
+            }
+        }
+        if let Some(&cursor) = self.cursors.peek() {
+            if cursor.start().is_right_before(self.text_position) {
+                self.handle_cursor_start();
+            }
+        }
+    }
+
+    fn handle_grapheme_end(&mut self) {
+        if let Some(active_cursor) = &self.active_cursor {
+            if active_cursor
+                .cursor
+                .end()
+                .is_right_before(self.text_position)
+            {
+                self.handle_cursor_end();
+            }
+        }
+        if let Some(&cursor) = self.cursors.peek() {
+            if cursor.start().is_right_after(self.text_position) {
+                self.handle_cursor_start();
+            }
+        }
+    }
+
+    fn handle_cursor_start(&mut self) {
+        self.active_cursor = Some(ActiveCursor {
+            cursor: self.cursors.next().unwrap(),
+            start_column_index: self.position.column_index,
+        });
+    }
+
+    fn handle_cursor_end(&mut self) {
+        let active_cursor = self.active_cursor.take().unwrap();
+        self.layout_cursor(active_cursor);
+    }
+
+    fn layout_cursor(&mut self, active_cursor: ActiveCursor) {
+        let start_column_index =
+            if active_cursor.cursor.start().position.line_index == self.text_position.line_index {
+                active_cursor.start_column_index
+            } else {
+                0
+            };
+        self.dispatch_event(
             Position {
                 row_index: self.position.row_index,
                 column_index: start_column_index,
             },
-            Element::Selection(self.position.column_index - start_column_index),
+            Event::SelectionFragment(if self.position.column_index == 0 {
+                1
+            } else {
+                self.position.column_index - start_column_index
+            }),
         );
+        if active_cursor.cursor.end().position == self.text_position {
+            self.dispatch_event(self.position, Event::SelectionEnd);
+        }
+        if active_cursor.cursor.caret.position.line_index == self.text_position.line_index {
+            self.dispatch_event(self.position, Event::Caret)
+        }
+    }
+
+    fn dispatch_event(&mut self, position: Position, event: Event<'a>) {
+        (self.handle_event)(position, event);
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ActiveSelection {
-    start_line_index: usize,
-    end: text::Position,
+struct ActiveCursor {
+    cursor: Cursor,
     start_column_index: usize,
 }
 
 pub fn layout<'a>(
     text: &'a Text,
-    selections: &'a SelectionSet,
-    f: impl FnMut(Position, Element<'a>),
+    cursors: &'a CursorSet,
+    dispatch_event: impl FnMut(Position, Event<'a>),
 ) {
-    let mut layouter = Layouter::new(selections, f);
+    let mut layouter = Layouter::new(cursors, dispatch_event);
     layouter.layout(text);
 }
