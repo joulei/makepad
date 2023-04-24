@@ -1,4 +1,4 @@
-use crate::{DeltaLen, Position, Size};
+use crate::text::{DeltaLen, Position, Range, Size};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Selection {
@@ -21,6 +21,10 @@ impl Selection {
 
     pub fn end(self) -> Position {
         self.cursor.max(self.anchor)
+    }
+
+    pub fn range(self) -> Range {
+        Range::new(self.start(), self.end())
     }
 
     pub fn apply_delta(self, delta_len: DeltaLen) -> Self {

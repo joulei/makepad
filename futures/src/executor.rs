@@ -72,7 +72,7 @@ struct Task {
 
 impl Task {
     fn run(self: Arc<Task>) {
-        use {std::task::Context, crate::task};
+        use {crate::task, std::task::Context};
 
         let future = self.inner.lock().unwrap().future.take();
         if let Some(mut future) = future {

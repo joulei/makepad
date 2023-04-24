@@ -1,3 +1,8 @@
+mod grapheme_indices;
+mod graphemes;
+
+pub use self::{grapheme_indices::GraphemeIndices, graphemes::Graphemes};
+
 pub trait StrExt {
     fn is_grapheme_boundary(&self, index: usize) -> bool;
     fn next_grapheme_boundary(&self, index: usize) -> Option<usize>;
@@ -39,53 +44,5 @@ impl StrExt for str {
 
     fn grapheme_indices(&self) -> GraphemeIndices<'_> {
         GraphemeIndices::new(self)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Graphemes<'a> {
-    string: &'a str,
-}
-
-impl<'a> Graphemes<'a> {
-    fn new(string: &'a str) -> Self {
-        Self {
-            string
-        }
-    }
-}
-
-impl<'a> Iterator for Graphemes<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let index = self.string.next_grapheme_boundary(0)?;
-        let (string_0, string_1) = self.string.split_at(index);
-        self.string = string_1;
-        Some(string_0)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct GraphemeIndices<'a> {
-    graphemes: Graphemes<'a>,
-    start_offset: usize
-}
-
-impl<'a> GraphemeIndices<'a> {
-    fn new(string: &'a str) -> Self {
-        Self {
-            graphemes: string.graphemes(),
-            start_offset: string.as_ptr() as usize,
-        }
-    }
-}
-
-impl<'a> Iterator for GraphemeIndices<'a> {
-    type Item = (usize, &'a str);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let grapheme = self.graphemes.next()?;
-        Some((grapheme.as_ptr() as usize - self.start_offset, grapheme))
     }
 }

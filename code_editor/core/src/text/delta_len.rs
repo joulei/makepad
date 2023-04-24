@@ -1,4 +1,4 @@
-use crate::{Range, Size};
+use super::{Range, Size};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct DeltaLen {
