@@ -53,7 +53,7 @@ struct AppState {
 impl AppState {
     pub fn new(cx: &mut Cx) -> Self {
         use {
-            makepad_code_editor_core::Text,
+            makepad_code_editor_core::text::Text,
             makepad_futures::channel::oneshot,
             std::{thread, time::Duration},
         };

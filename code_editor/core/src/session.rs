@@ -1,5 +1,5 @@
 use {
-    crate::{cursor::CursorSet, Document},
+    crate::{CursorSet, Document},
     std::{cell::RefCell, rc::Rc},
 };
 
@@ -13,7 +13,7 @@ impl Session {
     pub fn new(document: Rc<RefCell<Document>>) -> Rc<RefCell<Self>> {
         use crate::{
             cursor,
-            cursor::{Affinity, Cursor},
+            cursor::{Cursor, Affinity},
             text,
         };
 
