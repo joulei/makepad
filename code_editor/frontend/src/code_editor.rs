@@ -1,5 +1,5 @@
 use {
-    makepad_code_editor_core::{cursor_set, layout, text, text::Text, Cursor, CursorSet, Session},
+    makepad_code_editor_core::{cursor_set, layout, text, text::Text, Cursor, Session},
     makepad_widgets::*,
     std::iter::Peekable,
 };
@@ -65,18 +65,42 @@ impl CodeEditor {
     pub fn draw(&mut self, cx: &mut Cx2d, session: &Session) {
         let cell_size =
             self.draw_grapheme.text_style.font_size * self.draw_grapheme.get_monospace_base(cx);
-        let mut drawer = Drawer::new(
-            &mut self.draw_grapheme,
-            &mut self.draw_selection,
-            &mut self.draw_caret,
+        let mut drawer = Drawer {
+            draw_grapheme: &mut self.draw_grapheme,
+            draw_selection: &mut self.draw_selection,
+            draw_caret: &mut self.draw_caret,
             cell_size,
-            session.cursors(),
-        );
+            text_position: text::Position::default(),
+            layout_position: layout::Position::default(),
+            draw_position: DVec2::default(),
+            active_cursor: None,
+            cursors: session.cursors().iter().peekable(),
+            prev_selection: None,
+            selection: None,
+        };
         drawer.draw_text(cx, session.document().borrow().text());
     }
 
-    pub fn handle_event(&mut self, _cx: &mut Cx, _event: &Event) {
-        // TODO
+    pub fn handle_event(&mut self, cx: &mut Cx, session: &mut Session, event: &Event) {
+        use Event::*;
+
+        match event {
+            KeyDown(KeyEvent {
+                key_code: KeyCode::ArrowLeft,
+                ..
+            }) => {
+                session.update_cursors(Cursor::move_left);
+                cx.redraw_all();
+            }
+            KeyDown(KeyEvent {
+                key_code: KeyCode::ArrowRight,
+                ..
+            }) => {
+                session.update_cursors(Cursor::move_right);
+                cx.redraw_all();
+            }
+            _ => {}
+        }
     }
 }
 
@@ -95,40 +119,15 @@ pub struct Drawer<'a> {
 }
 
 impl<'a> Drawer<'a> {
-    fn new(
-        draw_grapheme: &'a mut DrawText,
-        draw_selection: &'a mut DrawSelection,
-        draw_caret: &'a mut DrawColor,
-        cell_size: DVec2,
-        cursors: &'a CursorSet,
-    ) -> Self {
-        Self {
-            draw_grapheme,
-            draw_selection,
-            draw_caret,
-            cell_size,
-            text_position: text::Position::default(),
-            layout_position: layout::Position::default(),
-            draw_position: DVec2::default(),
-            active_cursor: None,
-            cursors: cursors.iter().peekable(),
-            prev_selection: None,
-            selection: None,
-        }
-    }
-
     fn draw_text(&mut self, cx: &mut Cx2d, text: &Text) {
-        for line in text.as_lines() {
+        for line in text.as_lines().iter().take(20) {
             self.draw_line(cx, line);
-            self.text_position.line_index += 1;
-            self.layout_position.row_index += 1;
         }
     }
 
     fn draw_line(&mut self, cx: &mut Cx2d, line: &str) {
         use makepad_code_editor_core::layout::EventKind::*;
 
-        self.check_cursor_ends_right_before(cx);
         let start_row_index = self.layout_position.row_index;
         layout::layout_line(line, |event| {
             self.text_position.byte_index = event.byte_index;
@@ -136,29 +135,31 @@ impl<'a> Drawer<'a> {
                 row_index: start_row_index + event.position.row_index,
                 column_index: event.position.column_index,
             };
-            self.draw_position = DVec2 {
+             self.draw_position = DVec2 {
                 x: self.layout_position.column_index as f64 * self.cell_size.x,
                 y: self.layout_position.row_index as f64 * self.cell_size.y,
             };
             match event.kind {
-                VirtualLineEnd => {
+                StartOfVirtualLine => {
+                    self.handle_cursors_right_before(cx);
+                }
+                EndOfVirtualLine => {
+                    self.handle_cursors_right_after(cx);
                     if let Some(cursor) = self.active_cursor {
                         self.draw_cursor(cx, cursor);
                     }
                 }
-                GraphemeStart => {
-                    self.check_cursor_ends_right_after(cx);
+                StartOfGrapheme => {
+                    self.handle_cursors_right_after(cx);
                     self.draw_grapheme(cx, event.string);
-                    self.check_cursor_starts_right_before();
                 }
-                GraphemeEnd => {
-                    self.check_cursor_ends_right_before(cx);
-                    self.check_cursor_starts_right_after();
+                EndOfGrapheme => {
+                    self.handle_cursors_right_before(cx);
                 }
-                _ => {}
             }
         });
-        self.check_cursor_starts_right_after();
+        self.text_position.line_index += 1;
+        self.layout_position.row_index += 1;
     }
 
     fn draw_grapheme(&mut self, cx: &mut Cx2d, grapheme: &str) {
@@ -166,7 +167,15 @@ impl<'a> Drawer<'a> {
             .draw_abs(cx, self.draw_position, grapheme);
     }
 
-    fn check_cursor_starts_right_before(&mut self) {
+    fn handle_cursors_right_before(&mut self, cx: &mut Cx2d) {
+        if self.active_cursor.as_ref().map_or(false, |active_cursor| {
+            active_cursor
+                .cursor
+                .end()
+                .is_right_before(self.text_position)
+        }) {
+            self.handle_cursor_end(cx);
+        }
         if self.cursors.peek().map_or(false, |cursor| {
             cursor.start().is_right_before(self.text_position)
         }) {
@@ -174,15 +183,7 @@ impl<'a> Drawer<'a> {
         }
     }
 
-    fn check_cursor_starts_right_after(&mut self) {
-        if self.cursors.peek().map_or(false, |cursor| {
-            cursor.start().is_right_before(self.text_position)
-        }) {
-            self.handle_cursor_start();
-        }
-    }
-
-    fn check_cursor_ends_right_before(&mut self, cx: &mut Cx2d) {
+    fn handle_cursors_right_after(&mut self, cx: &mut Cx2d) {
         if self.active_cursor.as_ref().map_or(false, |active_cursor| {
             active_cursor
                 .cursor
@@ -191,16 +192,10 @@ impl<'a> Drawer<'a> {
         }) {
             self.handle_cursor_end(cx);
         }
-    }
-
-    fn check_cursor_ends_right_after(&mut self, cx: &mut Cx2d) {
-        if self.active_cursor.as_ref().map_or(false, |active_cursor| {
-            active_cursor
-                .cursor
-                .end()
-                .is_right_before(self.text_position)
+        if self.cursors.peek().map_or(false, |cursor| {
+            cursor.start().is_right_after(self.text_position)
         }) {
-            self.handle_cursor_end(cx);
+            self.handle_cursor_start();
         }
     }
 
@@ -281,7 +276,7 @@ impl<'a> Drawer<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct ActiveCursor {
     cursor: Cursor,
     start_x: f64,

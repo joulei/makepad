@@ -9,4 +9,4 @@ pub mod text;
 mod document;
 mod session;
 
-pub use self::{cursor_set::CursorSet, cursor::Cursor, document::Document, session::Session};
+pub use self::{cursor::Cursor, cursor_set::CursorSet, document::Document, session::Session};

@@ -42,7 +42,7 @@ impl AppMain for App {
             return;
         }
         self.ui.handle_widget_event(cx, event);
-        self.editor.handle_event(cx, event);
+        self.editor.handle_event(cx, &mut *self.app_state.session.borrow_mut(), event);
     }
 }
 

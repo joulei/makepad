@@ -1,5 +1,5 @@
 use {
-    crate::{CursorSet, Document},
+    crate::{Cursor, cursor::Context, CursorSet, Document},
     std::{cell::RefCell, rc::Rc},
 };
 
@@ -13,7 +13,7 @@ impl Session {
     pub fn new(document: Rc<RefCell<Document>>) -> Rc<RefCell<Self>> {
         use crate::{
             cursor,
-            cursor::{Cursor, Affinity},
+            cursor::{Affinity},
             text,
         };
 
@@ -43,5 +43,15 @@ impl Session {
 
     pub fn cursors(&self) -> &CursorSet {
         &self.cursors
+    }
+
+    pub fn update_cursors(&mut self, mut f: impl FnMut(Cursor, &Context) -> Cursor) {
+        let document = self.document.borrow();
+        let context = Context {
+            lines: document.text().as_lines(),
+        };
+        self.cursors.update(|cursor| {
+            f(cursor, &context)
+        });
     }
 }
