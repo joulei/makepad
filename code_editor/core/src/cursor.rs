@@ -1,4 +1,4 @@
-use crate::{text, text::DeltaLen};
+use crate::{text, text::DeltaDesc};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Cursor {
@@ -117,7 +117,7 @@ impl Cursor {
         }
     }
 
-    pub fn apply_delta(self, delta_len: DeltaLen) -> Self {
+    pub fn apply_delta(self, delta_len: DeltaDesc) -> Self {
         Self {
             caret: self.caret.apply_delta(delta_len),
             anchor: self.anchor.apply_delta(delta_len),
@@ -167,7 +167,7 @@ impl Position {
         self.position == position && self.affinity == Affinity::After
     }
 
-    pub fn apply_delta(self, delta_len: DeltaLen) -> Self {
+    pub fn apply_delta(self, delta_len: DeltaDesc) -> Self {
         Self {
             position: self.position.apply_delta(delta_len),
             affinity: self.affinity,

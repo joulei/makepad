@@ -53,7 +53,6 @@ struct AppState {
 impl AppState {
     pub fn new(cx: &mut Cx) -> Self {
         use {
-            makepad_code_editor_core::text::Text,
             makepad_futures::channel::oneshot,
             std::{thread, time::Duration},
         };
@@ -62,12 +61,11 @@ impl AppState {
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(0));
             sender
-                .send(Text::from(
-                    include_str!("code_editor.rs")
+                .send(include_str!("code_editor.rs")
                         .lines()
                         .map(|string| string.to_owned())
                         .collect::<Vec<_>>(),
-                ))
+                )
                 .unwrap();
         });
         let document = Document::new(cx.spawner(), {

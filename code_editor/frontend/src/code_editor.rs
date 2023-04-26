@@ -1,5 +1,5 @@
 use {
-    makepad_code_editor_core::{cursor_set, layout, text, text::Text, Cursor, Session},
+    makepad_code_editor_core::{cursor_set, layout, text, Cursor, Session},
     makepad_widgets::*,
     std::iter::Peekable,
 };
@@ -78,7 +78,9 @@ impl CodeEditor {
             prev_selection: None,
             selection: None,
         };
-        drawer.draw_text(cx, session.document().borrow().text());
+        for line in session.document().borrow().lines() {
+            drawer.draw_line(cx, line);
+        }
     }
 
     pub fn handle_event(&mut self, cx: &mut Cx, session: &mut Session, event: &Event) {
@@ -119,12 +121,6 @@ pub struct Drawer<'a> {
 }
 
 impl<'a> Drawer<'a> {
-    fn draw_text(&mut self, cx: &mut Cx2d, text: &Text) {
-        for line in text.as_lines().iter().take(20) {
-            self.draw_line(cx, line);
-        }
-    }
-
     fn draw_line(&mut self, cx: &mut Cx2d, line: &str) {
         use makepad_code_editor_core::layout::EventKind::*;
 

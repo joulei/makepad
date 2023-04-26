@@ -1,5 +1,5 @@
 use {
-    crate::{rc::WeakPtrEq, text::Text, Session},
+    crate::{rc::WeakPtrEq, Session},
     makepad_futures::executor::Spawner,
     std::{
         cell::RefCell,
@@ -12,22 +12,22 @@ use {
 #[derive(Debug)]
 pub struct Document {
     sessions: HashSet<WeakPtrEq<RefCell<Session>>>,
-    text: Text,
+    lines: Vec<String>,
 }
 
 impl Document {
-    pub fn new(spawner: &Spawner, load: impl Future<Output = Text> + 'static) -> Rc<RefCell<Self>> {
+    pub fn new(spawner: &Spawner, load: impl Future<Output = Vec<String>> + 'static) -> Rc<RefCell<Self>> {
         let document = Rc::new(RefCell::new(Self {
             sessions: HashSet::new(),
-            text: ["Loading...".into()].into(),
+            lines: ["Loading...".into()].into(),
         }));
         spawner
             .spawn({
                 let document = document.clone();
                 async move {
-                    let text = load.await;
+                    let lines = load.await;
                     let mut document = document.borrow_mut();
-                    document.text = text;
+                    document.lines = lines;
                 }
             })
             .unwrap();
@@ -38,8 +38,8 @@ impl Document {
         &self.sessions
     }
 
-    pub fn text(&self) -> &Text {
-        &self.text
+    pub fn lines(&self) -> &Vec<String> {
+        &self.lines
     }
 
     pub fn insert_session(&mut self, session: Weak<RefCell<Session>>) {
