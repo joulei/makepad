@@ -127,7 +127,7 @@ live_design!{
     Header = <BoxY> {
         walk: {width: Fill, height: 100}
         layout: {flow: Right, padding: 10.0, spacing: 10.0}
-        draw_bg: {color: (COLOR_OVERLAY_BG), inset: vec4(-0.5, -0.5, -1.0, 0.0), radius: vec2(0.5,4.5)}
+        draw_bg: {color: (COLOR_OVERLAY_BG), inset: vec4(-0.5, -0.5, -1.0, 0.0), radius: vec2(0.5, 4.5)}
         
         <Logo> {
             walk: {height: Fit, width: Fill, margin: {top: 30.0}}
@@ -139,7 +139,7 @@ live_design!{
     Menu = <BoxY> {
         walk: {width: Fill, height: 100}
         layout: {flow: Right, padding: 10.0, spacing: 10.0}
-        draw_bg: {color: (COLOR_OVERLAY_BG), inset: vec4(-0.5, 0.0, -1.0, -1.0), radius: vec2(4.5,0.5)}
+        draw_bg: {color: (COLOR_OVERLAY_BG), inset: vec4(-0.5, 0.0, -1.0, -1.0), radius: vec2(4.5, 0.5)}
         
         <Frame> {
             walk: {width: Fill, height: Fit, margin: 0.0}
@@ -186,10 +186,9 @@ live_design!{
             profile = <Frame> {
                 walk: {width: Fit, height: Fit, margin: {top: 7.5}}
                 layout: {flow: Down, padding: 0.0}
-                profile_img = <Image> {
-                    source: (IMG_PROFILE_A)
+                profile_img = <ImageFrame> {
+                    image: (IMG_PROFILE_A)
                     draw_bg: {
-                        scale: 0.65
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                             let c = self.rect_size * 0.5;
@@ -199,6 +198,7 @@ live_design!{
                             return sdf.result
                         }
                     }
+                    image_scale: .65
                     walk: {margin: 0}
                     layout: {padding: 0}
                 }
@@ -217,7 +217,7 @@ live_design!{
                 }
                 
                 text = <Label> {
-                    walk:{width:Fill, height:Fit},
+                    walk: {width: Fill, height: Fit},
                     draw_label: {
                         wrap: Word,
                         text_style: <TEXT_P> {},
@@ -243,9 +243,9 @@ live_design!{
         walk: {width: Fill, height: Fit}
         layout: {flow: Down, padding: 0.0, spacing: 0.0}
         
-        hero = <Image> {
-            source: (IMG_A),
-            walk: {margin: 0, width:Fill, height:250}
+        hero = <ImageFrame> {
+            image: (IMG_A),
+            walk: {margin: 0, width: Fill, height: 250}
             layout: {padding: 0}
         }
         
@@ -288,8 +288,8 @@ live_design!{
                 walk: {height: Fill, width: Fill}
                 layout: {flow: Down}
                 TopSpace = <Frame> {walk: {height: 100}}
-                Post = <Post>{}
-                PostImage = <PostImage>{}
+                Post = <Post> {}
+                PostImage = <PostImage> {}
                 BottomSpace = <Frame> {walk: {height: 100}}
             }
             
@@ -327,25 +327,25 @@ impl AppMain for App {
             while let Some(next) = self.ui.draw_widget(cx).hook_widget() {
                 if let Some(mut list) = news_feeds.has_widget(&next).borrow_mut() {
                     // lets set our scroll range so the scrollbar has something
-                    list.set_item_range(0, 3000, 1);
+                    list.set_item_range(0, 1000, 1);
                     // next visible item only returns items that are visible
                     // this means the performance here is O(visible)
-                    while let Some(item_id) = list.next_visible_item(cx){
-                        let template = match item_id{
-                            0=>id!(TopSpace),
-                            x if x%5 == 0=>id!(PostImage),
-                            _=>id!(Post)
+                    while let Some(item_id) = list.next_visible_item(cx) {
+                        let template = match item_id {
+                            0 => live_id!(TopSpace),
+                            x if x % 5 == 0 => live_id!(PostImage),
+                            _ => live_id!(Post)
                         };
                         let item = list.get_item(cx, item_id, template).unwrap();
-                        let text = match item_id%4{
-                            0=>format!("Item: {} Lorem ipsum dolor sit amet, consectetur adipiscing elit", item_id),
-                            1=>format!("Item: {} amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqu", item_id),
-                            2=>format!("Item: {} Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor", item_id),
-                            _=>format!("Item: {} Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.", item_id),
+                        let text = match item_id % 4 {
+                            0 => format!("Item: {} Lorem ipsum dolor sit amet, consectetur adipiscing elit", item_id),
+                            1 => format!("Item: {} amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqu", item_id),
+                            2 => format!("Item: {} Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor", item_id),
+                            _ => format!("Item: {} Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.", item_id),
                         };
                         item.get_label(id!(content.text)).set_label(&text);
-                        item.get_button(id!(likes)).set_label(&format!("{}", item_id%23));
-                        item.get_button(id!(comments)).set_label(&format!("{}", item_id%6));
+                        item.get_button(id!(likes)).set_label(&format!("{}", item_id % 23));
+                        item.get_button(id!(comments)).set_label(&format!("{}", item_id % 6));
                         item.draw_widget_all(cx);
                     }
                 }
@@ -355,7 +355,7 @@ impl AppMain for App {
         
         let actions = self.ui.handle_widget_event(cx, event);
         
-        for (_item_id,item) in news_feeds.items_with_actions(&actions) {
+        for (_item_id, item) in news_feeds.items_with_actions(&actions) {
             // check for actions inside the list item
             if item.get_button(id!(likes)).clicked(&actions) {
                 //log!("CLICKED LIKES on item {}", item_id);
