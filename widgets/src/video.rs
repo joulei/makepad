@@ -25,14 +25,7 @@ live_design! {
 // TODO:
 
 // - Add audio playback
-// - Add support for SemiPlanar nv21, currently we assume that SemiPlanar is nv12
 // - Add function to restart playback manually when not looping.
-
-// - Optimizations:
-//      - determine frame chunk size based on memory usage: minimal amount of frames to keep in memory for smooth playback considering their size
-//      - we're allocating new vec and copying data from java into rust when decoding, if we need to we could have a shared memory buffer between them, but that
-//        introduces a lot of complexity.
-
 
 #[derive(Live)]
 pub struct Video {
@@ -50,7 +43,7 @@ pub struct Video {
     #[live]
     source: LiveDependency,
     #[rust]
-    textures: [Option<Texture>; 3],
+    textures: Option<Texture>,
 
     // Playback
     #[live(false)]
@@ -77,12 +70,6 @@ pub struct Video {
     original_frame_rate: usize,
     #[rust]
     color_format: VideoColorFormat,
-
-    // Buffering
-    #[rust]
-    frames_buffer: SharedFrameBuffer,
-    #[rust]
-    tmp_recycled_vec: Vec<u8>,
 
     // Frame
     #[rust]
@@ -185,6 +172,21 @@ impl LiveHook for Video {
     }
 
     fn after_new_from_doc(&mut self, cx: &mut Cx) {
+        if self.texture.is_none() {
+            let new_texture = Texture::new(cx);
+            new_texture.set_format(
+                cx,
+                TextureFormat::VideoRGB {
+                    width: 720,
+                    height: 1280,
+                },
+            );
+            self.texture = Some(new_texture);
+        }
+
+        let texture = self.texture.as_mut().unwrap();
+        self.draw_bg.draw_vars.set_texture(0, &texture);
+
         self.id = LiveId::unique();
         if self.autoplay {
             self.begin_playback(cx);
@@ -237,29 +239,23 @@ impl Video {
             }
         }
 
-        if let Event::VideoChunkDecoded(video_id) = event {
-            if *video_id == self.id {
-                self.decoding_state = DecodingState::ChunkFinished;
-                self.available_to_fetch = true;
-            }
-        }
-
         if self.tick.is_event(event).is_some() {
+            self.redraw(cx);
             self.maybe_show_preview(cx);
             self.maybe_advance_playback(cx);
 
-            if self.should_fetch() {
-                self.available_to_fetch = false;
-                cx.fetch_next_video_frames(self.id, MAX_FRAMES_TO_DECODE);
-            } else if self.should_request_decoding() {
-                let frames_to_decode = if self.playback_state == PlaybackState::Previewing {
-                    1
-                } else {
-                    MAX_FRAMES_TO_DECODE
-                };
-                cx.decode_next_video_chunk(self.id, frames_to_decode);
-                self.decoding_state = DecodingState::Decoding;
-            }
+            // if self.should_fetch() {
+            //     self.available_to_fetch = false;
+            //     cx.fetch_next_video_frames(self.id, MAX_FRAMES_TO_DECODE);
+            // } else if self.should_request_decoding() {
+            //     let frames_to_decode = if self.playback_state == PlaybackState::Previewing {
+            //         1
+            //     } else {
+            //         MAX_FRAMES_TO_DECODE
+            //     };
+            //     cx.decode_next_video_chunk(self.id, frames_to_decode);
+            //     self.decoding_state = DecodingState::Decoding;
+            // }
         }
 
         self.handle_gestures(cx, event);
@@ -315,36 +311,16 @@ impl Video {
         //     self.color_format,
         //     self.frame_ts_interval
         // );
-
-        cx.decode_next_video_chunk(self.id, MAX_FRAMES_TO_DECODE + MAX_FRAMES_TO_DECODE / 2);
+ 
+        self.draw_bg.set_uniform(cx, id!(texture_available), &[1.0]);    
         self.decoding_state = DecodingState::Decoding;
-
-        self.begin_buffering_thread(cx);
         self.tick = cx.start_interval(8.0);
-    }
-
-    fn begin_buffering_thread(&mut self, cx: &mut Cx) {
-        let video_sender = self.decoding_receiver.sender();
-        cx.video_decoding_input(self.id, move |data| {
-            let _ = video_sender.send(data);
-        });
-
-        let frames_buffer = Arc::clone(&self.frames_buffer);
-
-        let (_new_sender, new_receiver) = channel();
-        let old_receiver = std::mem::replace(&mut self.decoding_receiver.receiver, new_receiver);
-
-        thread::spawn(move || loop {
-            let mut frame_group = old_receiver.recv().unwrap();
-            let mut buffer = frames_buffer.lock().unwrap();
-            buffer.append(&mut frame_group);
-        });
     }
 
     fn maybe_show_preview(&mut self, cx: &mut Cx) {
         if self.playback_state == PlaybackState::Previewing && !self.is_current_texture_preview {
             let frame_metadata = self.parse_next_frame_metadata();
-            self.update_textures(cx, &frame_metadata);
+            // self.update_textures(cx, &frame_metadata);
             self.is_current_texture_preview = true;
 
             self.draw_bg.set_uniform(cx, id!(is_last_frame), &[0.0]);
@@ -390,137 +366,6 @@ impl Video {
                 }
             }
         }
-    }
-
-    fn parse_next_frame_metadata(&self) -> FrameMetadata {
-        let mut frame_buffer = self.frames_buffer.lock().unwrap();
-        // | Timestamp (8B)  | Y Stride (4B) | U Stride (4B) | V Stride (4B) | isEoS (1B) | Pixel data length (4b) | Pixel Data |
-
-        if frame_buffer.len() < 25 {
-            panic!("Insufficient data to parse frame metadata");
-        }
-
-        // might have to update for different endianness depending of the platform
-        let timestamp = u64::from_be_bytes(frame_buffer[0..8].try_into().unwrap()) as u128;
-
-        let y_stride = u32::from_be_bytes(frame_buffer[8..12].try_into().unwrap()) as usize;
-        let u_stride = u32::from_be_bytes(frame_buffer[12..16].try_into().unwrap()) as usize;
-        let v_stride = u32::from_be_bytes(frame_buffer[16..20].try_into().unwrap()) as usize;
-
-        let is_eos = frame_buffer[20] != 0;
-
-        let frame_length = u32::from_be_bytes(frame_buffer[21..25].try_into().unwrap()) as usize;
-        let frame_range = 0..frame_length;
-
-        // Drain the metadata from the buffer
-        frame_buffer.drain(0..25);
-
-        FrameMetadata {
-            timestamp,
-            y_stride,
-            u_stride,
-            v_stride,
-            frame_range,
-            is_eos,
-        }
-    }
-
-    fn update_textures(&mut self, cx: &mut Cx, frame_metadata: &FrameMetadata) {
-        let range = &frame_metadata.frame_range;
-        let y_stride = frame_metadata.y_stride;
-        let u_stride = frame_metadata.u_stride;
-        let v_stride = frame_metadata.v_stride;
-
-        self.draw_bg
-            .set_uniform(cx, id!(y_stride), &[y_stride as f32]);
-        self.draw_bg
-            .set_uniform(cx, id!(u_stride), &[u_stride as f32]);
-        self.draw_bg
-            .set_uniform(cx, id!(v_stride), &[v_stride as f32]);
-
-        match self.color_format {
-            VideoColorFormat::YUV420Planar => {
-                // y
-                let y_plane_range = range.start..range.start + y_stride * self.video_height;
-                self.drain_frame_buffer(y_plane_range);
-                self.update_texture_r(cx, 0, self.video_width, self.video_height, y_stride);
-
-                // u
-                let u_plane_start = range.start;
-                let u_plane_range =
-                    u_plane_start..u_plane_start + u_stride * (self.video_height / 2);
-                self.drain_frame_buffer(u_plane_range);
-                self.update_texture_r(cx, 1, self.video_width / 2, self.video_height / 2, u_stride);
-
-                // v
-                let v_plane_start = u_plane_start;
-                let v_plane_range =
-                    v_plane_start..v_plane_start + v_stride * (self.video_height / 2);
-                self.drain_frame_buffer(v_plane_range);
-                self.update_texture_r(cx, 2, self.video_width / 2, self.video_height / 2, v_stride);
-            }
-            VideoColorFormat::YUV420SemiPlanar => {
-                // y
-                let y_plane_range = range.start..range.start + y_stride * self.video_height;
-                self.drain_frame_buffer(y_plane_range);
-                self.update_texture_r(cx, 0, self.video_width, self.video_height, y_stride);
-
-                // uv
-                let uv_plane_size = y_stride * self.video_height / 2;
-                let uv_plane_range = 0..uv_plane_size;
-                self.drain_frame_buffer(uv_plane_range);
-                self.update_texture_rg(cx, 1, self.video_width, self.video_height / 2, u_stride);
-            }
-            _ => todo!(),
-        }
-    }
-
-    fn drain_frame_buffer(&mut self, range: Range<usize>) {
-        let mut frame_buffer = self.frames_buffer.lock().unwrap();
-        self.tmp_recycled_vec.clear();
-        self.tmp_recycled_vec.extend(frame_buffer.drain(range));
-    }
-
-    fn update_texture_r(&mut self, cx: &mut Cx, slot: usize, width: usize, height: usize, stride: usize) {
-        if self.textures[slot].is_none() {
-            let new_texture = Texture::new(cx);
-            new_texture.set_format(
-                cx,
-                TextureFormat::VecRu8 {
-                    width,
-                    height,
-                    data: vec![],
-                    unpack_row_length: Some(stride),
-                },
-            );
-            self.textures[slot] = Some(new_texture);
-        }
-
-        let texture = self.textures[slot].as_mut().unwrap();
-        texture.swap_vec_u8(cx, &mut self.tmp_recycled_vec);
-
-        self.draw_bg.draw_vars.set_texture(slot, &texture);
-    }
-
-    fn update_texture_rg(&mut self, cx: &mut Cx, slot: usize, width: usize, height: usize, stride: usize) {
-        if self.textures[slot].is_none() {
-            let new_texture = Texture::new(cx);
-            new_texture.set_format(
-                cx,
-                TextureFormat::VecRGu8 {
-                    width,
-                    height,
-                    data: vec![],
-                    unpack_row_length: Some(stride),
-                },
-            );
-            self.textures[slot] = Some(new_texture);
-        } 
-
-        let texture = self.textures[slot].as_mut().unwrap();
-        texture.swap_vec_u8(cx, &mut self.tmp_recycled_vec);
-
-        self.draw_bg.draw_vars.set_texture(slot, &texture);
     }
 
     fn handle_gestures(&mut self, cx: &mut Cx, event: &Event) {
@@ -622,15 +467,3 @@ impl Video {
         }
     }
 }
-
-#[derive(Debug)]
-struct FrameMetadata {
-    timestamp: u128,
-    y_stride: usize,
-    u_stride: usize,
-    v_stride: usize,
-    frame_range: Range<usize>,
-    is_eos: bool,
-}
-
-type SharedFrameBuffer = Arc<Mutex<Vec<u8>>>;

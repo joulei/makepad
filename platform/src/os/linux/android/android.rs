@@ -266,7 +266,7 @@ impl Cx {
                     FromJavaMessage::MidiDeviceOpened {name, midi_device} => {
                         self.os.media.android_midi().lock().unwrap().midi_device_opened(name, midi_device);
                     }
-                    FromJavaMessage::VideoDecodingInitialized {video_id, frame_rate, video_width, video_height, color_format, duration} => {
+                    FromJavaMessage::VideoDecodingInitialized {video_id, frame_rate, video_width, video_height, color_format, duration, surface_texture} => {
                         let e = Event::VideoDecodingInitialized(
                             VideoDecodingInitializedEvent {
                                 video_id: LiveId(video_id),
@@ -277,6 +277,9 @@ impl Cx {
                                 duration,
                             }
                         );
+
+                        self.os.video_surfaces.insert(LiveId(video_id), surface_texture);
+
                         self.call_event_handler(&e);
                     },
                     FromJavaMessage::VideoStream {video_id, frames_group} => {
@@ -361,6 +364,10 @@ impl Cx {
     }
     
     pub fn android_entry<F>(activity: *const std::ffi::c_void, startup: F) where F: FnOnce() -> Box<Cx> + Send + 'static {
+        std::panic::set_hook(Box::new(|info| {
+            crate::makepad_error_log::log!("Custom panic hook: {}", info);
+        }));
+
         let (from_java_tx, from_java_rx) = mpsc::channel();
         
         unsafe {android_jni::jni_init_globals(activity, from_java_tx)};
@@ -695,6 +702,16 @@ impl Cx {
                         android_jni::to_java_decode_next_video_chunk(env, video_id, max_frames_to_decode);
                     }
                 },
+                CxOsOp::UpdateVideoSurfaceTexture(video_id) => {
+                    self.os.video_surface = Some(surface_texture);
+                    if let Some(surface_texture) = self.os.video_surfaces.get(video_id) {
+                        unsafe {
+                            crate::makepad_error_log::log!(">>>>>>>> Updating Tex Image");
+                            let env = attach_jni_env();
+                            android_jni::to_java_update_tex_image(env, surface_texture);
+                        }
+                    }
+                },
                 CxOsOp::FetchNextVideoFrames(video_id, number_frames) => {
                     unsafe {
                         let env = attach_jni_env();
@@ -742,7 +759,8 @@ impl Default for CxOs {
             display: None,
             quit: false,
             fullscreen: false,
-            timers: Default::default()
+            timers: Default::default(),
+            video_surface: None,
         }
     }
 }
@@ -775,6 +793,7 @@ pub struct CxOs {
     pub (crate) display: Option<CxAndroidDisplay>,
     pub (crate) media: CxAndroidMedia,
     pub (crate) decoding: CxAndroidDecoding,
+    pub (crate) video_surfaces: Hashmap<LiveId, jobject>,
 }
 
 impl CxAndroidDisplay {

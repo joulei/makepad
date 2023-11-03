@@ -1,6 +1,7 @@
 package dev.makepad.android;
 
 import android.view.Surface;
+import android.graphics.SurfaceTexture;
 import android.view.MotionEvent;
 import java.nio.ByteBuffer;
 
@@ -31,7 +32,7 @@ public class MakepadNative {
     public native static void onMidiDeviceOpened(String name, Object midi_device);
 
     // video decoding
-    public static native void onVideoDecodingInitialized(long videoId, int frameRate, int videoWidth, int videoHeight, String colorFormat, long duration);
+    public static native void onVideoDecodingInitialized(long videoId, int frameRate, int videoWidth, int videoHeight, String colorFormat, long duration, SurfaceTexture surfaceTexture);
     public static native void onVideoStream(long videoId, ByteBuffer frameGroup);
     public static native void onVideoChunkDecoded(long videoId);
     public static native void onVideoDecodingError(long videoId, String error);

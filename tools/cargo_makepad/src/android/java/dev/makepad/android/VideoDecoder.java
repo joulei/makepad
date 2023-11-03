@@ -21,6 +21,17 @@ import android.util.Log;
 
 import dev.makepad.android.MakepadNative;
 
+import android.graphics.SurfaceTexture;
+import android.view.Surface;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.opengl.EGL14;
+import android.opengl.EGLContext;
+import android.opengl.EGLSurface;
+import android.opengl.EGLDisplay;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class VideoDecoder {
     public VideoDecoder(Activity activity, long videoId, BlockingQueue<ByteBuffer> videoFrameQueue) {
         mActivityReference = new WeakReference<>(activity);
@@ -29,9 +40,28 @@ public class VideoDecoder {
     }
 
     public void initializeVideoDecoding(byte[] video) {
-        mExtractor = new MediaExtractor();
-
         try {
+            Thread.sleep(2000);
+
+            Log.e("Makepad", "Initializing video decoding");
+            int textureIdFromRust = 1; // for now
+            mExtractor = new MediaExtractor();
+            SurfaceTexture surfaceTexture = new SurfaceTexture(textureIdFromRust);
+
+            // HandlerThread handlerThread = new HandlerThread("GLHandlerThread");
+            // handlerThread.start();
+            // Handler glHandler = new Handler(handlerThread.getLooper());
+            surfaceTexture.setOnFrameAvailableListener(new SurfaceTexture.OnFrameAvailableListener() {
+                @Override
+                public void onFrameAvailable(SurfaceTexture surfaceTexture) {
+                    Log.e("Makepad", ">>>>>>>>>>>>>>>> ON FRAME AVAILABLE: " + surfaceTexture.getTimestamp());
+                    mFramesAvailable.incrementAndGet();
+                }
+            });//, glHandler);
+
+            mAllowDecoding = true;
+            Surface surface = new Surface(surfaceTexture);
+
             Activity activity = mActivityReference.get();
 
             ByteArrayMediaDataSource dataSource = new ByteArrayMediaDataSource(video);
@@ -67,22 +97,10 @@ public class VideoDecoder {
 
                 // Check if the codec is a decoder and supports our desired MIME type
                 if (!codecInfo.isEncoder() && Arrays.asList(codecInfo.getSupportedTypes()).contains(videoMimeType)) {
-                    // Only then proceed with checking if it's a hardware codec and has the desired color format
                     if (codecName.toLowerCase().contains("omx")) {
-                        MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(videoMimeType);
-                        for (int color : capabilities.colorFormats) {
-                            // Debug
-                            // Log.e("Makepad", "Supported Color Format: " + color);
-                            if (color == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) {
-                                selectedCodecName = codecName;
-                                isHWCodec = true;
-                                break;
-                            }
-                        }
-
-                        if (selectedCodecName != null) {
-                            break;
-                        }
+                        selectedCodecName = codecName;
+                        isHWCodec = true;
+                        break;
                     }
                 }
             }
@@ -96,6 +114,8 @@ public class VideoDecoder {
             mCodec.setCallback(new MediaCodec.Callback() {
                 @Override
                 public void onInputBufferAvailable(MediaCodec mc, int inputBufferId) {
+                    // Log.e("Makepad", "BEGINING onInputBufferAvailable");
+                    
                     if (!mAllowDecoding) {
                         mc.queueInputBuffer(inputBufferId, 0, 0, 0, 0);
                         return;
@@ -122,66 +142,17 @@ public class VideoDecoder {
                         mc.queueInputBuffer(inputBufferId, 0, sampleSize, presentationTimeUs, 0);
                         mExtractor.advance();
                     }
+                    // Log.e("Makepad", "END onInputBufferAvailable");
                 }
-
+                
                 @Override
                 public void onOutputBufferAvailable(MediaCodec mc, int outputBufferId, MediaCodec.BufferInfo info) {
-                    ByteBuffer outputBuffer = mc.getOutputBuffer(outputBufferId);
-                    if (outputBuffer != null && outputBuffer.hasRemaining()) {
-                        byte firstByte = outputBuffer.get(0);
-
-                        Image outputImage = mCodec.getOutputImage(outputBufferId);
-                        int yStride =  outputImage.getPlanes()[0].getRowStride();
-                        int uStride, vStride;
-                        if (mIsPlanar) {
-                            uStride = outputImage.getPlanes()[1].getRowStride();
-                            vStride = outputImage.getPlanes()[2].getRowStride();
-                        } else {
-                            uStride = vStride = outputImage.getPlanes()[1].getRowStride();
-                        }
-
-                        // Construct the ByteBuffer for the frame and metadata
-                        // | Timestamp (8B)  | Y Stride (4B) | U Stride (4B) | V Stride (4B) | isEoS (1B) | Frame data length (4B) | Pixel Data |
-                        int metadataSize = 25;
-                        int totalSize = metadataSize + info.size;
-                        ByteBuffer frameBuffer = acquireBuffer(totalSize);
-                        frameBuffer.clear();
-                        frameBuffer.putLong(info.presentationTimeUs);
-                        frameBuffer.putInt(yStride);
-                        frameBuffer.putInt(uStride);
-                        frameBuffer.putInt(vStride);
-                        frameBuffer.put((byte) (mInputEos ? 1 : 0));
-                        frameBuffer.putInt(info.size);
-
-                        int oldLimit = outputBuffer.limit();
-                        outputBuffer.limit(outputBuffer.position() + info.size);
-                        frameBuffer.put(outputBuffer);
-                        outputBuffer.limit(oldLimit);
-
-                        frameBuffer.flip();
-
-                        mVideoFrameQueue.add(frameBuffer);
-
-                        mc.releaseOutputBuffer(outputBufferId, false);
-                        outputImage.close();
-
-                        mFramesProcessed++;
-
-                        if (mFramesProcessed >= mDesiredFrames) {
-                            mIsDecoding = false;
-                            mAllowDecoding = false;
-                            mFramesProcessed = 0;
-                            if (activity != null) {
-                                activity.runOnUiThread(() -> {
-                                    MakepadNative.onVideoChunkDecoded(mVideoId);
-                                });
-                            }
-                        }
-                    }
+                    mc.releaseOutputBuffer(outputBufferId, true);
                 }
 
                 @Override
                 public void onOutputFormatChanged(MediaCodec mc, MediaFormat format) {
+                    Log.e("Makepad", "BEGINING onOutputFormatChanged");
                     // todo: update color format if necessary
                 }
 
@@ -189,28 +160,23 @@ public class VideoDecoder {
                 public void onError(MediaCodec mc, MediaCodec.CodecException e) {
                     if (activity != null) {
                         activity.runOnUiThread(() -> {
-                            String message = e.getMessage();
-                            MakepadNative.onVideoDecodingError(mVideoId, message != null ? message : ("Error decoding video: " + e.toString()));
+                            String message = e.getMessage() != null? e.getMessage() : ("Error decoding video: " + e.toString());
+                            Log.e("Makepad", "onERROR: " + e.getDiagnosticInfo());
+                            MakepadNative.onVideoDecodingError(mVideoId, message);
                         });
                     }
                 }
             });
 
-            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
-            mCodec.configure(format, null, null, 0);
+            // format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
+            mCodec.configure(format, surface, null, 0);
             mCodec.start();
 
-            MediaFormat outputFormat = mCodec.getOutputFormat();
-            int colorFormat = outputFormat.containsKey(MediaFormat.KEY_COLOR_FORMAT) 
-                ? outputFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT) 
-                : -1;
-
-            String colorFormatString = getColorFormatString(colorFormat);
+            String colorFormatString = "someColorFormat";
             
             // Debug
             // Log.e("Makepad", "Using Codec: " + mCodec.getName());
-
-            mInfo = new MediaCodec.BufferInfo();
+            // mInfo = new MediaCodec.BufferInfo();
             mInputEos = false;
             mOutputEos = false;
 
@@ -225,12 +191,17 @@ public class VideoDecoder {
                         mVideoWidth,
                         mVideoHeight,
                         colorFormatString,
-                        duration);
+                        duration,
+                        surfaceTexture);
                 });
             }
+
+        } catch (IllegalStateException e) {
+            Log.e("Makepad", "CATCH: " + e.getMessage());
         } catch (Exception e) {
-            String message = e.getMessage();
-            MakepadNative.onVideoDecodingError(mVideoId, message != null ? message : ("Error initializing video decoding: " + e.toString()));
+            String message = e.getMessage() != null? e.getMessage() : ("Error decoding video: " + e.toString());
+            Log.e("Makepad", "CATCH: " + message);
+            MakepadNative.onVideoDecodingError(mVideoId, message);
         }
     }
 
@@ -351,6 +322,8 @@ public class VideoDecoder {
     private int mVideoHeight;
     private boolean mIsFlexibleFormat = false;
     private boolean mIsPlanar = false;
+
+    private AtomicInteger mFramesAvailable = new AtomicInteger(0);
     
     // input
     private long mVideoId;

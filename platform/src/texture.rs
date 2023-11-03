@@ -81,6 +81,7 @@ pub enum TextureFormat {
     RenderRGBAf16{size:TextureSize},
     RenderRGBAf32{size:TextureSize},
     SharedBGRAu8{width:usize, height:usize, id:crate::cx_stdin::PresentableImageId},
+    VideoRGB{width: usize, height: usize}
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -98,6 +99,7 @@ pub enum TextureCategory{
     Render{initial:bool},
     DepthBuffer{initial:bool},
     Shared{initial:bool},
+    Video{initial:bool},
 }
 
 impl PartialEq for TextureCategory{
@@ -107,6 +109,7 @@ impl PartialEq for TextureCategory{
             Self::Render{..} => if let Self::Render{..} = other{true} else {false},
             Self::Shared{..} => if let Self::Shared{..} = other{true} else {false},
             Self::DepthBuffer{..} => if let Self::DepthBuffer{..} = other{true} else {false},           
+            Self::Video{..} => if let Self::Video{..} = other{true} else {false},           
         }
     }
 }
@@ -121,6 +124,7 @@ pub(crate) enum TexturePixel{
     RGu8,
     Rf32,
     D32,
+    VideoRGB
 }
 
 impl CxTexture{
@@ -134,6 +138,7 @@ impl CxTexture{
     
     pub(crate) fn check_updated(&mut self)->bool{
         if let Some(alloc) = &mut self.alloc{
+            crate::makepad_error_log::log!("Alloc {:?}", alloc);
             if let TextureCategory::Vec{updated} = &mut alloc.category{
                 let u = *updated;
                 *updated = false;
@@ -172,7 +177,9 @@ impl CxTexture{
             match &mut alloc.category{
                 TextureCategory::Render{initial} |
                 TextureCategory::DepthBuffer{initial} |
-                TextureCategory::Shared{initial}=>{
+                TextureCategory::Shared{initial} |
+                TextureCategory::Video { initial }
+                =>{
                     let u = *initial;
                     *initial = false;
                     return u
@@ -223,6 +230,16 @@ impl CxTexture{
         }
         false
     }
+
+    pub(crate) fn alloc_video(&mut self)->bool{
+        if let Some(alloc) = self.format.as_video_alloc(){
+            if self.alloc.is_none() || self.alloc.as_ref().unwrap() != &alloc{
+                self.alloc = Some(alloc);
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl TextureFormat{
@@ -259,7 +276,14 @@ impl TextureFormat{
             _=>false
         }
     }
-    
+
+    pub fn is_video(&self) -> bool {
+        match self {
+            Self::VideoRGB{..} => true,
+            _ => false
+        }
+    }
+
     pub fn vec_width_height(&self)->Option<(usize,usize)>{
         match self{
             Self::VecBGRAu8_32{width, height, .. }=>Some((*width,*height)),
@@ -361,6 +385,20 @@ impl TextureFormat{
             _=>None
         }
     }
+
+    pub(crate) fn as_video_alloc(&self)->Option<TextureAlloc>{
+        match self{
+            Self::VideoRGB{width, height,..}=>{
+                Some(TextureAlloc{
+                    width: *width,
+                    height: *height,
+                    pixel:TexturePixel::VideoRGB,
+                    category: TextureCategory::Video{initial:true}
+                })
+            },
+            _=>None
+        }
+    }
     
     #[allow(unused)]
     pub(crate) fn as_shared_alloc(&self)->Option<TextureAlloc>{
@@ -439,6 +477,16 @@ impl Texture {
             _=>{
                 panic!("Not the correct texture desc for f32 image buffer")
             }
+        }
+    }
+
+    pub fn bind(&self, cx: &mut Cx) {
+        let cxtexture = &mut cx.textures[self.texture_id()];
+        match &mut cxtexture.format{
+            TextureFormat::VideoRGB{..} => {
+                cxtexture.set_updated(true);
+            },
+            _ => panic!("Not the correct texture desc")
         }
     }
 }

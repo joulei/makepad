@@ -79,6 +79,7 @@ pub enum CxOsOp {
 
     InitializeVideoDecoding(LiveId, Rc<Vec<u8>>),
     DecodeNextVideoChunk(LiveId, usize),
+    UpdateVideoSurfaceTexture(LiveId),
     FetchNextVideoFrames(LiveId, usize),
     CleanupVideoDecoding(LiveId),
 }
@@ -467,6 +468,10 @@ impl Cx {
 
     pub fn decode_next_video_chunk(&mut self, video_id: LiveId, max_frames_to_decode: usize) {
         self.platform_ops.push(CxOsOp::DecodeNextVideoChunk(video_id, max_frames_to_decode));
+    }
+
+    pub fn update_video_surface_texture(&mut self, video_id: LiveId) {
+        self.platform_ops.push(CxOsOp::UpdateVideoSurfaceTexture(video_id));
     }
 
     pub fn fetch_next_video_frames(&mut self, video_id: LiveId, number_frames: usize) {

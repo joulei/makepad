@@ -84,6 +84,7 @@ pub enum FromJavaMessage {
         video_height: u32,
         color_format: String,
         duration: u128,
+        surface_texture: jni_sys::jobject,
     },
     VideoStream {
         video_id: u64,
@@ -377,8 +378,15 @@ pub unsafe extern "C" fn Java_dev_makepad_android_MakepadNative_onVideoDecodingI
     video_height: jni_sys::jint,
     color_format: jni_sys::jstring,
     duration: jni_sys::jlong,
+    surface_texture: jni_sys::jobject // this is new
 ) {
+    // let env = jni_sys::JNIEnv::from_raw(env).unwrap();
+    let env = attach_jni_env();    
+
     let color_format = unsafe { jstring_to_string(env, color_format) };
+    // let surface_texture_ref = env.new_global_ref(JObject::from(surface_texture)).unwrap(); 
+    let env = attach_jni_env();
+    let global_ref = (**env).NewGlobalRef.unwrap()(env, surface_texture);
 
     send_from_java_message(FromJavaMessage::VideoDecodingInitialized {
         video_id: video_id as u64,
@@ -387,6 +395,7 @@ pub unsafe extern "C" fn Java_dev_makepad_android_MakepadNative_onVideoDecodingI
         video_height: video_height as u32,
         color_format,
         duration: duration as u128,
+        surface_texture: global_ref
     });
 }
 
@@ -643,3 +652,36 @@ pub unsafe fn to_java_cleanup_video_decoding(env: *mut jni_sys::JNIEnv, video_id
         video_id
     );
 }    
+
+pub unsafe fn to_java_update_image_tex(env: *mut jni_sys::JNIEnv, surface_ref: jni_sys::jobject) {
+    // call updateImageTex from SurfaceTexture with the surface_ref reference
+    ndk_utils::call_void_method!(
+        env,
+        ACTIVITY,
+        "updateImageTex",
+        "(Ljava/lang/Object;)V",
+        surface_ref
+    );
+}
+
+pub unsafe fn to_java_update_tex_image(env: *mut jni_sys::JNIEnv, surface_ref: jni_sys::jobject) {
+    let class_surface_texture = (**env).GetObjectClass.unwrap()(env, surface_ref);
+    let update_tex_image_cstring = CString::new("updateTexImage").unwrap();
+    let signature_cstring = CString::new("()V").unwrap();
+    let mid_update_tex_image = (**env).GetMethodID.unwrap()(
+        env, 
+        class_surface_texture, 
+        update_tex_image_cstring.as_ptr(), 
+        signature_cstring.as_ptr()
+    );
+
+    // ndk_utils::call_void_method!(
+    //     env,
+    //     ACTIVITY,
+    //     "updateImageTex",
+    //     "(Ljava/lang/Object;)V",
+    //     surface_ref
+    // );
+    (**env).CallVoidMethod.unwrap()(env, surface_ref, mid_update_tex_image);
+    crate::makepad_error_log::log!("Update image tex called");
+}

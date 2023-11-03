@@ -192,6 +192,8 @@ impl Cx {
                         
                         if cxtexture.format.is_vec(){
                             cxtexture.update_vec_texture();
+                        } else if cxtexture.format.is_video() {
+                            cxtexture.update_video_texture();
                         }
                     }
                     for i in 0..sh.mapping.textures.len() {
@@ -714,9 +716,10 @@ impl GlShader{
 
 impl CxOsDrawShader {
     pub fn new(vertex: &str, pixel: &str) -> Self {
-        
+        //FIXME: shouldn't need to add the extension require on both vertex and pixel shaders
         let vertex = format!("
             #version 100
+            #extension GL_OES_EGL_image_external : require
             precision highp float;
             precision highp int;
             vec4 sample2d(sampler2D sampler, vec2 pos){{return texture2D(sampler, vec2(pos.x, pos.y)).zyxw;}} 
@@ -725,14 +728,16 @@ impl CxOsDrawShader {
             mat3 transpose(mat3 m){{return mat3(m[0][0],m[1][0],m[2][0],m[0][1],m[1][1],m[2][1],m[0][2],m[1][2],m[2][2]);}}
             mat2 transpose(mat2 m){{return mat2(m[0][0],m[1][0],m[0][1],m[1][1]);}}
             {}\0", vertex);
-        
+
         let pixel = format!("
             #version 100
             #extension GL_OES_standard_derivatives : enable
+            #extension GL_OES_EGL_image_external : require
             precision highp float;
             precision highp int;
             vec4 sample2d(sampler2D sampler, vec2 pos){{return texture2D(sampler, vec2(pos.x, pos.y)).zyxw;}}
             vec4 sample2d_rt(sampler2D sampler, vec2 pos){{return texture2D(sampler, vec2(pos.x, 1.0-pos.y));}}
+            vec4 sample2dOES(samplerExternalOES sampler, vec2 pos){{ return texture2D(sampler, vec2(pos.x, pos.y));}}
             mat4 transpose(mat4 m){{return mat4(m[0][0],m[1][0],m[2][0],m[3][0],m[0][1],m[1][1],m[2][1],m[3][1],m[0][2],m[1][2],m[2][2],m[3][3], m[3][0], m[3][1], m[3][2], m[3][3]);}}
             mat3 transpose(mat3 m){{return mat3(m[0][0],m[1][0],m[2][0],m[0][1],m[1][1],m[2][1],m[0][2],m[1][2],m[2][2]);}}
             mat2 transpose(mat2 m){{return mat2(m[0][0],m[1][0],m[0][1],m[1][1]);}}
@@ -955,6 +960,32 @@ impl CxTexture {
                 _=>{panic!()}
             }
             unsafe{
+                gl_sys::BindTexture(gl_sys::TEXTURE_2D, 0);
+            }
+        }
+    }
+
+    pub fn update_video_texture(&mut self) {
+        if self.alloc_video(){
+            if self.os.gl_texture.is_none() { 
+                unsafe {
+                    let mut gl_texture = std::mem::MaybeUninit::uninit();
+                    gl_sys::GenTextures(1, gl_texture.as_mut_ptr());
+                    self.os.gl_texture = Some(gl_texture.assume_init());
+                }
+            }
+        }
+        if self.check_initial() {
+            unsafe{
+                gl_sys::BindTexture(gl_sys::TEXTURE_EXTERNAL_OES, self.os.gl_texture.unwrap());
+                log!("UPDATE VIDEO TEXTURE - Texture ID: {}", self.os.gl_texture.unwrap());
+        
+                gl_sys::TexParameteri(gl_sys::TEXTURE_EXTERNAL_OES, gl_sys::TEXTURE_WRAP_S, gl_sys::CLAMP_TO_EDGE as i32);
+                gl_sys::TexParameteri(gl_sys::TEXTURE_EXTERNAL_OES, gl_sys::TEXTURE_WRAP_T, gl_sys::CLAMP_TO_EDGE as i32);
+
+                gl_sys::TexParameteri(gl_sys::TEXTURE_2D, gl_sys::TEXTURE_MIN_FILTER, gl_sys::LINEAR as i32);
+                 gl_sys::TexParameteri(gl_sys::TEXTURE_2D, gl_sys::TEXTURE_MAG_FILTER, gl_sys::LINEAR as i32);
+        
                 gl_sys::BindTexture(gl_sys::TEXTURE_2D, 0);
             }
         }
