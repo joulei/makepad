@@ -348,7 +348,8 @@ live_design!{
         draw_bg: {
             shape: Solid,
             fill: Image
-            texture video_texture: textureOES
+            // texture video_texture: textureOES // android
+            texture video_texture: texture2d // ios
             texture thumbnail_texture: texture2d
             uniform show_thumbnail: 0.0
 
@@ -366,7 +367,8 @@ live_design!{
                     if self.show_thumbnail > 0.0 {
                         return sample2d(self.thumbnail_texture, self.pos).xyzw;
                     } else {
-                        return sample2dOES(self.video_texture, self.pos);
+                        return sample2d(self.video_texture, self.pos);
+                        // return sample2dOES(self.video_texture, self.pos);
                     }  
                 }
 
@@ -399,11 +401,14 @@ live_design!{
                 if self.show_thumbnail > 0.5 {
                     return sample2d(self.thumbnail_texture, adjusted_pos).xyzw;
                 } else {
-                    return sample2dOES(self.video_texture, adjusted_pos);
+                    return sample2d(self.video_texture, adjusted_pos); // ios
+                    // return sample2dOES(self.video_texture, adjusted_pos); // android
                 }      
             }
 
             fn pixel(self) -> vec4 {
+                // return #x0;
+                return sample2d(self.video_texture, self.pos);
                 let color = self.get_color_scale_pan();
                 return Pal::premul(vec4(color.xyz, color.w * self.opacity));
             }

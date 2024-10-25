@@ -44,7 +44,7 @@ pub mod modal;
 pub mod tooltip;
 pub mod popup_notification;
 // Only available on Android at the moment
-// #[cfg(target_os="android")]
+// #[cfg(target_os="android")] // TODO: REMOVE THIS
 pub mod video;
 pub mod rotated_image;
 pub mod slide_panel;

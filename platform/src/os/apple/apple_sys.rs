@@ -199,6 +199,8 @@ extern {
     pub static AVAudioSessionRouteChangeNotification: ObjcId;
     pub static AVCaptureDeviceWasConnectedNotification: ObjcId;
     pub static AVCaptureDeviceWasDisconnectedNotification: ObjcId;
+    pub static AVPlayerItemOutputNewFrameAvailable: ObjcId;
+    pub static AVPlayerLayer: ObjcId;
 }
 
 pub type CMFormatDescriptionRef = ObjcId;
@@ -221,6 +223,11 @@ pub type CMTimeValue = i64;
 pub type CMTimeScale = i32;
 pub type CMTimeEpoch = i64;
 pub type CMTimeFlags = u32;
+
+pub type CVTimeStamp = u64;
+// pub type CMTime = i64;
+pub type CVMetalTextureCacheRef = *mut c_void;
+pub type CVMetalTextureRef = *mut c_void;
 
 pub const kCMTimeFlags_Valid: CMTimeFlags = 1 << 0;
 pub const kCMTimeFlags_HasBeenRounded: CMTimeFlags = 1 << 1;
@@ -259,6 +266,7 @@ extern {
     pub fn CMVideoFormatDescriptionGetDimensions(videoDesc: CMFormatDescriptionRef) -> CMVideoDimensions;
     pub fn CMFormatDescriptionGetMediaSubType(desc: CMFormatDescriptionRef) -> u32;
     pub fn CMSampleBufferGetImageBuffer(sbuf: CMSampleBufferRef) -> CVImageBufferRef;
+    pub fn CMTimeMake(value: i64, timescale: i32) -> CMTime;
 }
 
 #[link(name = "CoreVideo", kind = "framework")]
@@ -266,6 +274,7 @@ extern {
     pub static kCVPixelBufferWidthKey: CFStringRef;
     pub static kCVPixelBufferHeightKey: CFStringRef;
     pub static kCVPixelBufferPixelFormatTypeKey: CFStringRef;
+    pub static kCVPixelBufferMetalCompatibilityKey: CFStringRef;
     pub fn CVPixelBufferLockBaseAddress(pixelBuffer: CVPixelBufferRef, lockFlags: CVPixelBufferLockFlags,) -> CVReturn;
     pub fn CVPixelBufferUnlockBaseAddress(pixelBuffer: CVPixelBufferRef, unlockFlags: CVPixelBufferLockFlags,) -> CVReturn;
     pub fn CVPixelBufferGetDataSize(pixelBuffer: CVPixelBufferRef) -> std::os::raw::c_ulong;
@@ -274,12 +283,40 @@ extern {
     pub fn CVPixelBufferGetHeight(pixelBuffer: CVPixelBufferRef) -> usize;
     pub fn CVPixelBufferGetBytesPerRow(pixelBuffer: CVPixelBufferRef) -> usize;
     pub fn CVPixelBufferIsPlanar(pixelBuffer: CVPixelBufferRef) -> bool;
+
+    pub fn CVGetCurrentHostTime() -> CVTimeStamp;
+    pub fn CVMetalTextureCacheCreate(
+        allocator: CFAllocatorRef,
+        cache_attributes: CFDictionaryRef,
+        metal_device: ObjcId,
+        texture_attributes: CFDictionaryRef,
+        cache_out: *mut CVMetalTextureCacheRef
+    ) -> CVReturn;
+    
+    pub fn CVMetalTextureCacheCreateTextureFromImage(
+        allocator: CFAllocatorRef,
+        texture_cache: CVMetalTextureCacheRef,
+        source_image: CVImageBufferRef,
+        texture_attributes: CFDictionaryRef,
+        pixel_format: MTLPixelFormat,
+        width: usize,
+        height: usize,
+        plane_index: usize,
+        texture_out: *mut CVMetalTextureRef
+    ) -> CVReturn;
+    
+    pub fn CVMetalTextureGetTexture(image: CVMetalTextureRef) -> ObjcId;
+    // pub fn CVMetalTextureRelease(texture: CVMetalTextureRef);
+    pub fn CVPixelBufferRelease(buffer: CVPixelBufferRef);
 }
 
-
 // Foundation
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    pub fn CFRelease(cf: CFTypeRef);
+}
 
-
+pub type CFTypeRef = *const c_void;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -1296,5 +1333,78 @@ extern "C" {
     
 }
 
+pub struct NSString;
 
+impl NSString {
+    pub unsafe fn new(s: &str) -> ObjcId {
+        let ns_str: ObjcId = msg_send![class!(NSString),
+            stringWithUTF8String:s.as_ptr()
+        ];
+        ns_str
+    }
+}
 
+pub fn nsurl_from_str(s: &str) -> ObjcId {
+    unsafe {
+        let s = NSString::new(s);
+        let url: ObjcId = msg_send![class!(NSURL), URLWithString:s];
+        if url == nil {
+            panic!("Invalid URL string");
+        }
+        url
+    }
+}
+
+// Macro for creating NSDictionary
+#[macro_export]
+macro_rules! ns_dict {
+    ($($key:expr => $value:expr),* $(,)*) => {{
+        // unsafe {
+        let dict: ObjcId = msg_send![class!(NSMutableDictionary), dictionary];
+        $(
+            let () = msg_send![dict, setObject:$value forKey:$key];
+        )*
+        dict
+        // }
+    }}
+}
+
+// Constants
+pub const kCFAllocatorDefault: CFAllocatorRef = 0 as CFAllocatorRef;
+pub const kCVReturnSuccess: CVReturn = 0;
+
+// Type aliases for Foundation types
+pub type CFAllocatorRef = *const c_void;
+pub type CFDictionaryRef = *const c_void;
+
+pub const kCVPixelFormatType_32BGRA: u32 = four_char_as_u32("BGRA");
+pub const kCVPixelFormatType_32RGBA: u32 = four_char_as_u32("RGBA");
+
+// pub const kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange: u32 = four_char_as_u32("420v");
+// pub const kCVPixelFormatType_420YpCbCr8BiPlanarFullRange: u32 = four_char_as_u32("420f");
+
+// If you don't already have the four_char_as_u32 function:
+// #[allow(dead_code)]
+// pub fn four_char_as_u32(four_chars: &str) -> u32 {
+//     let mut res = 0u32;
+//     for (i, byte) in four_chars.bytes().enumerate() {
+//         res |= (byte as u32) << ((3 - i) * 8);
+//     }
+//     res
+// }
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct CGRect {
+    pub origin: CGPoint,
+    pub size: CGSize,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct CGPoint {
+    pub x: CGFloat,
+    pub y: CGFloat,
+}
+
+pub type CGFloat = f64;

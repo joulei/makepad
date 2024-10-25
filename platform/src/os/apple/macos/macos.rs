@@ -48,7 +48,9 @@ use {
     }
 };
 
-
+use crate::event::VideoSource;
+use crate::event::VideoDecodingErrorEvent;
+use crate::av_player::AvPlayerAccess;
 #[derive(Clone)]
 pub struct MetalWindow {
     pub window_id: WindowId,
@@ -90,6 +92,15 @@ impl MetalWindow {
             let () = msg_send![view, setWantsLayer: YES];
             let () = msg_send![view, setLayerContentsPlacement: 11];
             let () = msg_send![view, setLayer: ca_layer];
+
+            // Add observer for video frame updates
+            let notification_center: ObjcId = msg_send![class!(NSNotificationCenter), defaultCenter];
+            let () = msg_send![notification_center,
+                addObserver:cocoa_window.view
+                selector:sel!(handleVideoFrame:)
+                name:NSString::new("MakepadVideoFrameAvailable")
+                object:nil
+            ];
         }
         
         MetalWindow {
@@ -132,6 +143,13 @@ impl MetalWindow {
     
 }
  
+// #[sel(handleVideoFrame:)]
+// fn handle_video_frame(&self, _notification: ObjcId) {
+//     // Signal a redraw, similar to Android's implementation
+//     // self.signal_redraw();
+//     log!("handle_video_frame");
+//     SignalToUI::set_ui_signal();
+// }
 
 const KEEP_ALIVE_COUNT: usize = 5;
 
@@ -265,6 +283,11 @@ impl Cx {
                         self.call_event_handler(&Event::Signal);
                     }
                     self.handle_action_receiver();
+                    if let Ok(updated) = self.os.av_player.update_if_needed() {
+                        if updated {
+                            self.redraw_all();
+                        }
+                    }
                     if self.handle_live_edit() {
                         self.call_event_handler(&Event::LiveEdit);
                         self.redraw_all();
@@ -537,15 +560,58 @@ impl Cx {
                 CxOsOp::CopyToClipboard(content) => {
                     get_macos_app_global().copy_to_clipboard(&content);
                 },
-                CxOsOp::PrepareVideoPlayback(_, _, _, _, _) => todo!(),
-                CxOsOp::BeginVideoPlayback(_) => todo!(),
-                CxOsOp::PauseVideoPlayback(_) => todo!(),
+                CxOsOp::BeginVideoPlayback(_video_id) => {
+                    if let Some(player) = &self.os.av_player.player {
+                        unsafe {
+                            let () = msg_send![player.as_id(), play];  // Use as_id() to get the ObjcId
+                        }
+                    }
+                },
+                
+                CxOsOp::PauseVideoPlayback(_video_id) => {
+                    if let Some(player) = &self.os.av_player.player {
+                        unsafe {
+                            let () = msg_send![player.as_id(), pause];
+                        }
+                    }
+                },
+                
+                CxOsOp::PrepareVideoPlayback(video_id, source, texture_handle, autoplay, _should_loop) => {
+                    if let VideoSource::Network(url) = source {
+                        if let Err(e) = self.os.av_player.prepare_playback(
+                            video_id, 
+                            &url, 
+                            texture_handle, 
+                            self.os.metal_device.unwrap()) { // todo dont unwrap
+                                let e = Event::VideoDecodingError(VideoDecodingErrorEvent {
+                                    video_id,
+                                    error: e,
+                                });
+                                self.call_event_handler(&e);
+                        }
+                        // Set autoplay if provided
+                        if autoplay {
+                            if let Some(player) = &self.os.av_player.player {
+                                unsafe {
+                                    let () = msg_send![player.as_id(), play];
+                                }
+                            }
+                        }
+                    }
+                },
+                
+                CxOsOp::UpdateVideoSurfaceTexture(_video_id) => {
+                    if let Ok(updated) = self.os.av_player.update_if_needed() {
+                        if updated {
+                            self.redraw_all();
+                        }
+                    }
+                },
+
                 CxOsOp::ResumeVideoPlayback(_) => todo!(),
                 CxOsOp::MuteVideoPlayback(_) => todo!(),
                 CxOsOp::UnmuteVideoPlayback(_) => todo!(),
                 CxOsOp::CleanupVideoPlaybackResources(_) => todo!(),
-                CxOsOp::UpdateVideoSurfaceTexture(_) => todo!(),
-
                 CxOsOp::SaveFileDialog(settings) => 
                 {
                     get_macos_app_global().open_save_file_dialog(settings);
@@ -598,6 +664,8 @@ impl CxOsApi for Cx {
         self.apple_bundle_load_dependencies();
         #[cfg(not(apple_bundle))]
         self.native_load_dependencies();
+
+        // self.os.av_player = Some(AvPlayerAccess::new());
     }
     
     fn spawn_thread<F>(&mut self, f: F) where F: FnOnce() + Send + 'static {
@@ -638,4 +706,5 @@ pub struct CxOs {
     pub (crate) start_time: Option<Instant>,
     pub (crate) http_requests: AppleHttpRequests,
     pub metal_device: Option<ObjcId>,
+    pub (crate) av_player: AvPlayerAccess,
 }

@@ -269,8 +269,23 @@ impl LiveHook for Video {
             self.draw_bg.draw_vars.set_texture(0, &texture);
         }
 
-        #[cfg(not(target_os = "android"))]
-        error!("Video Widget is currently only supported on Android.");
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        {
+            if self.video_texture.is_none() {
+                let new_texture = Texture::new_with_format(cx, TextureFormat::VecBGRAu8_32 {
+                    width: 500,
+                    height: 500,
+                    data: Some(vec![0; 500 * 500 * 4]),
+                    updated: TextureUpdated::Full,
+                });
+                self.video_texture = Some(new_texture);
+            }
+            let texture = self.video_texture.as_mut().unwrap();
+            self.draw_bg.draw_vars.set_texture(0, &texture);
+        }
+
+        // #[cfg(not(target_os = "android"))]
+        // error!("Video Widget is currently only supported on Android.");
 
         match cx.os_type() {
             OsType::Android(params) => {
@@ -400,6 +415,7 @@ impl Video {
                 VideoDataSource::Filesystem { path } => VideoSource::Filesystem(path.to_string()),
             };
 
+            log!("calling cx.prepare_video_playback");
             cx.prepare_video_playback(
                 self.id,
                 source,

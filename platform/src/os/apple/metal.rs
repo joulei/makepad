@@ -190,6 +190,7 @@ impl Cx {
                         let () = msg_send![encoder, setFragmentBytes: ct.as_ptr() as *const std::ffi::c_void length: (ct.len() * 4) as u64 atIndex: 3u64];
                     }
                 }
+                let mut to_dispatch = Vec::new();
                 // lets set our textures
                 for i in 0..sh.mapping.textures.len() {
                     
@@ -222,6 +223,15 @@ impl Cx {
                             metal_cx,
                         );
                     }
+
+                    let event = crate::Event::TextureHandleReady(
+                        crate::event::TextureHandleReadyEvent {
+                            texture_id,
+                            // handle: cxtexture.os.texture.clone().unwrap().as_id() as u32
+                            handle: 0
+                        }
+                    );
+                    to_dispatch.push(event);
                     
                     if let Some(texture) = cxtexture.os.texture.as_ref() {
                         let () = unsafe {msg_send![
@@ -255,6 +265,10 @@ impl Cx {
                 gpu_read_guards.push(draw_item.os.instance_buffer.get().gpu_read());
                 gpu_read_guards.push(geometry.os.vertex_buffer.get().gpu_read());
                 gpu_read_guards.push(geometry.os.index_buffer.get().gpu_read());
+            
+                for event in to_dispatch.iter() {
+                    self.call_event_handler(&event);
+                }
             }
         }
     }

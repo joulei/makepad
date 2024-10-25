@@ -28,6 +28,13 @@ live_design!{
                     button3 = <Button> {
                         text: "Button 3"
                     }
+
+                    <Video> {
+                        autoplay: true,
+                        width: 300.0,
+                        height: 300.0,
+                        source: Network { url: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"}
+                    }
                 }
             }
         }

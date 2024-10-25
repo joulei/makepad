@@ -262,6 +262,12 @@ pub fn define_macos_window_delegate() -> *const Class {
     extern fn window_did_fail_to_enter_fullscreen(_this: &Object, _: Sel, _: ObjcId) {
     }
     
+    extern fn handle_video_frame(this: &Object, _: Sel, _notification: ObjcId) {
+        println!("handle_video_frame");
+        let cw = get_cocoa_window(this);
+        cw.send_change_event();
+    }
+
     let superclass = class!(NSObject);
     let mut decl = ClassDecl::new("RenderWindowDelegate", superclass).unwrap();
     
@@ -294,6 +300,11 @@ pub fn define_macos_window_delegate() -> *const Class {
         // custom timer fn
         //decl.add_method(sel!(windowReceivedTimer:), window_received_timer as extern fn(&Object, Sel, id));
         
+        // callback for video frame updates
+        decl.add_method(
+            sel!(handleVideoFrame:),
+            handle_video_frame as extern fn(&Object, Sel, ObjcId)
+        );
     }
     // Store internal state as user data
     decl.add_ivar::<*mut c_void>("macos_window_ptr");
