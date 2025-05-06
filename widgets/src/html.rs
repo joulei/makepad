@@ -85,41 +85,41 @@ live_design!{
         padding: <THEME_MSPACE_1> {}
         
         font_size: (THEME_FONT_SIZE_P),
-        font_color: (THEME_COLOR_TEXT),
+        font_color: (THEME_COLOR_LABEL_OUTER),
         
         draw_normal: {
             text_style: <THEME_FONT_REGULAR> {
                 font_size: (THEME_FONT_SIZE_P)
             }
-            color: (THEME_COLOR_TEXT)
+            color: (THEME_COLOR_LABEL_OUTER)
         }
         
         draw_italic: {
             text_style: <THEME_FONT_ITALIC> {
                 font_size: (THEME_FONT_SIZE_P)
             }
-            color: (THEME_COLOR_TEXT)
+            color: (THEME_COLOR_LABEL_OUTER)
         }
         
         draw_bold: {
             text_style: <THEME_FONT_BOLD> {
                 font_size: (THEME_FONT_SIZE_P)
             }
-            color: (THEME_COLOR_TEXT)
+            color: (THEME_COLOR_LABEL_OUTER)
         }
         
         draw_bold_italic: {
             text_style: <THEME_FONT_BOLD_ITALIC> {
                 font_size: (THEME_FONT_SIZE_P)
             }
-            color: (THEME_COLOR_TEXT)
+            color: (THEME_COLOR_LABEL_OUTER)
         }
         
         draw_fixed: {
             text_style: <THEME_FONT_CODE> {
                 font_size: (THEME_FONT_SIZE_P)
             }
-            color: (THEME_COLOR_TEXT)
+            color: (THEME_COLOR_LABEL_OUTER)
         }
         
         code_layout: {
@@ -153,10 +153,10 @@ live_design!{
         a = <HtmlLink> {}
         
         draw_block:{
-            line_color: (THEME_COLOR_TEXT)
-            sep_color: (THEME_COLOR_DIVIDER)
+            line_color: (THEME_COLOR_LABEL_OUTER)
+            sep_color: (THEME_COLOR_SHADOW)
             quote_bg_color: (THEME_COLOR_BG_HIGHLIGHT)
-            quote_fg_color: (THEME_COLOR_TEXT)
+            quote_fg_color: (THEME_COLOR_LABEL_OUTER)
             code_color: (THEME_COLOR_BG_HIGHLIGHT)
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -802,10 +802,18 @@ impl Widget for HtmlLink {
         tf.underline.pop();
 
         let (start, end) = tf.areas_tracker.pop_tracker();
-
-        self.drawn_areas = SmallVec::from(
-            &tf.areas_tracker.areas[start..end]
-        );
+        
+        if self.drawn_areas.len() == end-start{
+            for i in 0..end-start{
+                self.drawn_areas[i] = cx.update_area_refs( self.drawn_areas[i], 
+                tf.areas_tracker.areas[i+start]);
+            }
+        }
+        else{
+            self.drawn_areas = SmallVec::from(
+                &tf.areas_tracker.areas[start..end]
+            );
+        }
 
         DrawStep::done()
     }

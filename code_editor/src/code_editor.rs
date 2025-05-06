@@ -122,7 +122,7 @@ live_design! {
         draw_gutter: {
             draw_depth: 1.0,
             text_style: <THEME_FONT_CODE> {},
-            color: (THEME_COLOR_TEXT_META),
+            color: (THEME_COLOR_LABEL_OUTER),
         }
         draw_text: {
             draw_depth: 1.0,
@@ -143,7 +143,7 @@ live_design! {
         }
         draw_indent_guide: {
            // draw_depth: 1.0,
-            color: (THEME_COLOR_U_2),
+            color: (THEME_COLOR_U_2)
         }
         draw_decoration: {
           //  draw_depth: 2.0,
@@ -154,8 +154,8 @@ live_design! {
 
         draw_cursor: {
           //  draw_depth: 4.0,
-            uniform blink: 0.0
             instance focus: 0.0
+            instance blink: 1.0
             fn pixel(self) -> vec4 {
                 let color = mix(THEME_COLOR_U_HIDDEN, mix(self.color, THEME_COLOR_U_HIDDEN, self.blink),self.focus);
                 return vec4(color.rgb*color.a, color.a);
@@ -234,7 +234,7 @@ pub struct CodeEditor {
     #[live] draw_cursor: DrawColor,
     #[live] draw_cursor_bg: DrawColor,
     #[live] draw_bg: DrawColor,
-    #[rust(KeepCursorInView::Off)] keep_cursor_in_view: KeepCursorInView,
+    #[rust(KeepCursorInView::Off)] pub keep_cursor_in_view: KeepCursorInView,
     #[rust] last_cursor_screen_pos: Option<DVec2>,
     #[live] pad_left_top: DVec2, 
     #[rust] cell_size: DVec2,
@@ -250,7 +250,9 @@ pub struct CodeEditor {
     #[live(false)] read_only: bool,
     #[live(true)] show_gutter: bool,
     #[live(2usize)] gutter_pad: usize,
+    #[live(true)] empty_page_at_end: bool,
         
+    
     #[live(0.5)] blink_speed: f64,
 
     #[animator] animator: Animator,
@@ -258,7 +260,7 @@ pub struct CodeEditor {
     #[rust] blink_timer: Timer,
 }
 
-enum KeepCursorInView {
+pub enum KeepCursorInView {
     Once,
     Always(DVec2, NextFrame),
     LockStart,
@@ -526,7 +528,8 @@ impl CodeEditor {
             },
         };
         self.draw_bg.draw_abs(cx, bg_rect);
-
+        self.draw_cursor.begin_many_instances(cx);
+                
         if self.show_gutter{
             self.draw_gutter(cx, session);
         }
@@ -535,16 +538,18 @@ impl CodeEditor {
         self.draw_indent_guide_layer(cx, session);
         self.draw_decoration_layer(cx, session);
         self.draw_selection_layer(cx, session);
-
         // Get the last added selection.
         // Get the normalized cursor position. To go from normalized to screen position, multiply by
         // the cell size, then shift by the viewport origin.
         
         cx.turtle_mut().set_used(
             session.layout().width() * self.cell_size.x +self.pad_left_top.x,
-            self.height_scale * session.layout().height() * self.cell_size.y + if height_is_fit{0.0} else {self.viewport_rect.size.y}
+            self.height_scale * session.layout().height() * self.cell_size.y + 
+            if height_is_fit || !self.empty_page_at_end{0.0} else {self.viewport_rect.size.y}
             +self.pad_left_top.y * self.height_scale
         );
+        
+        self.draw_cursor.end_many_instances(cx);
         
         self.scroll_bars.end(cx);
         
@@ -1166,7 +1171,10 @@ impl CodeEditor {
                                         self.draw_text.draw_abs(
                                             cx,
                                             DVec2 { x, y: origin_y + y } * self.cell_size
-                                                + self.viewport_rect.pos + self.cell_offset_y,
+                                                + dvec2(
+                                                    self.viewport_rect.pos.x,
+                                                    self.viewport_rect.pos.y + self.cell_offset_y
+                                                ),
                                             grapheme,
                                         );
                                         byte_index += grapheme.len();

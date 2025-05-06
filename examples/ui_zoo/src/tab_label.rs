@@ -10,23 +10,11 @@ live_design!{
 
     pub DemoLabel = <UIZooTabLayout_B> {
         desc = {
-            <H3> { text: "<Label>"}
+            <Markdown> { body: dep("crate://self/resources/label.md") } 
         }
         demos = {
             <H4> { text: "Standard" }
             <Label> { text:"Default single line text" }
-            
-            <Hr> {}
-            <H4> { text: "Styled" }
-            <Label> {
-                draw_text: {
-                    color: (THEME_COLOR_MAKEPAD)
-                    text_style: {
-                        font_size: 20,
-                    }
-                },
-                text: "You can style text using colors and fonts"
-            }
             
             <Hr> {}
             <H4> { text: "LabelGradientX" }
@@ -57,20 +45,11 @@ live_design!{
                 
                 text: "<LabelGradientY>"
             }
-            
+ 
             <Hr> {}
-            <H4> { text: "Customized" }
-            <Label> {
-                draw_text: {
-                    fn get_color(self) ->vec4{
-                        return mix((THEME_COLOR_MAKEPAD), (THEME_COLOR_U_HIDDEN), self.pos.x)
-                    }
-                    color: (THEME_COLOR_MAKEPAD)
-                    text_style: {
-                        font_size: 40.,
-                    }
-                },
-                text: "OR EVEN SOME PIXELSHADERS"
+            <H4> { text: "TextBox" }
+            <TextBox> {
+                text: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur?"
             }
 
             
@@ -88,6 +67,37 @@ live_design!{
             <Pitalic> { text: "P italic copy text" }
             <Pbold> { text: "P bold copy text" }
             <Pbolditalic> { text: "P bold italic copy text" }
+
+            <Hr> {}
+            <H4> { text: "Styling Attributes Reference" }
+            <Label> {
+                draw_text: {
+                    color: #0ff,
+
+                    text_style: {
+                        font_size: 20.,
+                        line_spacing: 1.4,
+                        font_family:{ latin = font("crate://makepad_widgets/resources/IBMPlexSans-Italic.ttf", 0.0, 0.0) }
+                    }
+                    wrap: Word
+                }
+                text: "You can style text using colors and fonts"
+            }
+            
+            <Hr> {}
+            <H4> { text: "Custom Shader" }
+            <Label> {
+                draw_text: {
+                    fn get_color(self) ->vec4{
+                        return mix((THEME_COLOR_MAKEPAD), (THEME_COLOR_U_HIDDEN), self.pos.x)
+                    }
+                    color: (THEME_COLOR_MAKEPAD)
+                    text_style: {
+                        font_size: 40.,
+                    }
+                },
+                text: "OR EVEN SOME PIXELSHADERS"
+            }
         }
     }
 }

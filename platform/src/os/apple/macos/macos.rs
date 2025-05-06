@@ -239,10 +239,7 @@ impl Cx {
             self.call_event_handler(&Event::Shutdown);
             return EventFlow::Exit
         }
-        
         // send a mouse up when dragging starts
-        
-        let mut paint_dirty = false;
         match &event {
             MacosEvent::MouseDown(_) |
             MacosEvent::MouseMove(_) |
@@ -255,6 +252,9 @@ impl Cx {
             }
             MacosEvent::Timer(te) => {
                 if te.timer_id == 0 {
+                    if self.screenshot_requests.len()>0{
+                        self.repaint_windows();
+                    }
                     if self.os.keep_alive_counter>0 {
                         self.os.keep_alive_counter -= 1;
                         self.repaint_windows();
@@ -273,8 +273,10 @@ impl Cx {
                         self.redraw_all();
                     }
                     self.handle_networking_events();
-                    
-                    return EventFlow::Poll;
+                    self.cocoa_event_callback(MacosEvent::Paint, metal_cx, metal_windows);
+
+                    // block till the next timer
+                    return EventFlow::Wait;
                 }
             }
             _ => ()
@@ -287,7 +289,6 @@ impl Cx {
                         self.repaint_pass(main_pass_id);
                     }
                 }
-                paint_dirty = true;
                 self.call_event_handler(&Event::AppGotFocus);
             }
             MacosEvent::AppLostFocus => {
@@ -425,18 +426,20 @@ impl Cx {
                 self.call_event_handler(&Event::TextCut(e))
             }
             MacosEvent::Timer(e) => {
-                self.call_event_handler(&Event::Timer(e))
+                self.call_event_handler(&Event::Timer(e));
+                return EventFlow::Wait;
             }
             MacosEvent::MacosMenuCommand(e) => {
                 self.call_event_handler(&Event::MacosMenuCommand(e))
             }
         }
         
-        if self.any_passes_dirty() || self.need_redrawing()/* || self.new_next_frames.len() != 0*/ || paint_dirty {
-            EventFlow::Poll
-        } else {
-            EventFlow::Wait
-        }
+        //if self.any_passes_dirty() || self.need_redrawing()/* || self.new_next_frames.len() != 0*/ || paint_dirty {
+        // the timer is the primary wait flow   
+        EventFlow::Poll
+        //} else {
+         //   EventFlow::Wait
+       // }
     }
     
     fn dpi_override_scale(&self, pos:&mut DVec2, window_id:WindowId){

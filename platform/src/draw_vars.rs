@@ -79,7 +79,7 @@ pub const fn shader_enum(i: u32) -> u32 {
     i
 }
 
-pub const DRAW_CALL_USER_UNIFORMS: usize = 192;
+pub const DRAW_CALL_USER_UNIFORMS: usize = 256;
 pub const DRAW_CALL_TEXTURE_SLOTS: usize = 4;
 pub const DRAW_CALL_VAR_INSTANCES: usize = 32;
 
@@ -417,6 +417,7 @@ impl DrawVars {
                 // DONE!
                 cx.passes[draw_list.pass_id.unwrap()].paint_dirty = true;
                 if uniform_updated{
+                    
                     // not calling redraw when uniforms change might cause
                     // incorrect drawcall splitting, so we have to. Unfortunately.
                     self.area.redraw(cx);

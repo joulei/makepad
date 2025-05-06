@@ -39,6 +39,23 @@ pub enum FileRequest {
         path: String, 
         id: u64
     },
+    CreateSnapshot{
+        root: String,
+        message: String,
+    },
+    LoadSnapshotImage{
+        root: String,
+        hash: String,
+    },
+    LoadSnapshot{
+        root: String,
+        hash: String,
+    },
+    SaveSnapshotImage{
+        root: String,
+        hash: String,
+        data: Vec<u8>,
+    },
     /// Requests the collab server to apply the given delta to the given revision of the file with
     /// the given id.
     SaveFile{
@@ -93,6 +110,53 @@ pub struct OpenFileResponse{
     pub id: u64, 
 }
 
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct LoadSnapshotImageResponse{
+    pub root: String,
+    pub hash: String,
+    pub data: Vec<u8>, 
+}
+
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct LoadSnapshotImageError{
+    pub root: String,
+    pub hash: String,
+    pub error: FileError,
+}
+
+
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct SaveSnapshotImageResponse{
+    pub root: String,
+    pub hash: String,
+}
+
+
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct CreateSnapshotResponse{
+    pub root: String,
+    pub hash: String,
+}
+
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct LoadSnapshotResponse{
+    pub root: String,
+    pub hash: String,
+}
+
+
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct CreateSnapshotError{
+    pub root: String,
+    pub error:String,
+}
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct LoadSnapshotError{
+    pub root: String,
+    pub error:String,
+}
+
+
 /// Each `Response` corresponds to the `Request` with the same name.
 #[derive(Clone, Debug, SerBin, DeBin)]
 pub enum FileResponse {
@@ -104,6 +168,12 @@ pub enum FileResponse {
     /// The result of requesting the collab server to apply a delta to a revision of the file with
     /// the given id.
     SaveFile(Result<SaveFileResponse, FileError>),
+    
+    LoadSnapshotImage(Result<LoadSnapshotImageResponse, LoadSnapshotImageError>),
+    SaveSnapshotImage(Result<SaveSnapshotImageResponse, FileError>),
+                
+    CreateSnapshot(Result<CreateSnapshotResponse, CreateSnapshotError>),
+    LoadSnapshot(Result<LoadSnapshotResponse, LoadSnapshotError>),
     // Existing variants...
     SearchInProgress(u64)
 }
@@ -117,6 +187,19 @@ pub struct FileTreeData {
     pub root: FileNodeData,
 }
 
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct GitLog{
+    pub root: String,
+    pub commits: Vec<GitCommit>,
+}
+
+#[derive(Clone, Debug, SerBin, DeBin)]
+pub struct GitCommit {
+    pub hash: String,
+    pub message: String,
+}
+
+
 /// A type for representing data about a node in a file tree.
 /// 
 /// Each node is either a directory a file. Directories form the internal nodes of the file tree.
@@ -124,7 +207,7 @@ pub struct FileTreeData {
 /// of the file tree, and do not contain any further nodes.
 #[derive(Clone, Debug, SerBin, DeBin)]
 pub enum FileNodeData {
-    Directory { entries: Vec<DirectoryEntry> },
+    Directory { git_log: Option<GitLog>, entries: Vec<DirectoryEntry> },
     File { data: Option<Vec<u8>> },
 }
 
@@ -162,7 +245,8 @@ pub enum FileNotification {
 #[derive(Clone, Debug, SerBin, DeBin)]
 pub enum FileError {
     Unknown(String),
-    CannotOpen(String)
+    RootNotFound(String),
+    CannotOpen(String),
 }
 
 /// An identifier for files on the collab server.

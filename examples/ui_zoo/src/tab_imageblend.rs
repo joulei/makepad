@@ -10,14 +10,14 @@ live_design!{
 
     pub DemoImageBlend = <UIZooTabLayout_B> {
         desc = {
-            <H3> { text: "<ImageBlend>"}
+            <Markdown> { body: dep("crate://self/resources/imageblend.md") } 
         }
         demos = {
             <H4> { text: "Standard" }
             blendbutton = <Button> { text: "Blend Image"}
 
             blendimage = <ImageBlend> {
-                align: { x: 0.0, y: 0.0 }
+                align: { x:0.0, y: 0.0 }
                 image_a: {
                     source: dep("crate://self/resources/ducky.png"),
                     fit: Smallest

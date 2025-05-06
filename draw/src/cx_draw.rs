@@ -21,7 +21,7 @@ use {
         nav::CxNavTreeRc,
         icon_atlas::CxIconAtlasRc,
         draw_list_2d::DrawList2d,
-        text::{fonts::Fonts, layouter},
+        text::{loader::FontFamilyDefinition, fonts::Fonts, layouter},
     },
     makepad_rustybuzz::UnicodeBuffer,
 };
@@ -50,7 +50,7 @@ impl<'a> DerefMut for CxDraw<'a> {fn deref_mut(&mut self) -> &mut Self::Target {
 
 impl<'a> Drop for CxDraw<'a> {
     fn drop(&mut self) {
-        if !self.fonts.borrow_mut().update_textures(&mut self.cx) {
+        if !self.fonts.borrow_mut().prepare_textures(&mut self.cx) {
             self.cx.redraw_all();
         }
         self.draw_icon_atlas();
@@ -64,6 +64,7 @@ impl<'a> CxDraw<'a> {
         Self::lazy_construct_icon_atlas(cx);
         cx.redraw_id += 1;
         let fonts = cx.get_global::<Rc<RefCell<Fonts>>>().clone();
+        fonts.borrow_mut().prepare_atlases_if_needed(cx);
         let nav_tree_rc = cx.get_global::<CxNavTreeRc>().clone();
         let icon_atlas_rc = cx.get_global::<CxIconAtlasRc>().clone();
         Self{
@@ -81,14 +82,19 @@ impl<'a> CxDraw<'a> {
 
 impl<'a> CxDraw<'a>{
      
-    pub fn lazy_construct_fonts(cx: &mut Cx) {
-        if !cx.has_global::<Rc<RefCell<Fonts>>>() {
-            let fonts = Fonts::new(
-                cx,
-                layouter::Settings::default(),
-            );
-            cx.set_global(Rc::new(RefCell::new(fonts)));
+    pub fn lazy_construct_fonts(cx: &mut Cx) -> bool {
+        if cx.has_global::<Rc<RefCell<Fonts>>>() {
+            return false;
         }
+        let mut fonts = Fonts::new(
+            cx,
+            layouter::Settings::default(),
+        );
+        fonts.define_font_family(0.into(), FontFamilyDefinition {
+            font_ids: vec![]
+        });
+        cx.set_global(Rc::new(RefCell::new(fonts)));
+        true
     }   
     
     pub fn get_current_window_id(&self)->Option<WindowId>{
@@ -182,9 +188,6 @@ impl<'a> CxDraw<'a>{
         dl.append_sub_list(self.cx.redraw_id, draw_list_2d.id());
     }
     
-    pub fn update_fonts_textures(&mut self) {
-        self.fonts.borrow_mut().update_textures(&mut self.cx);
-    }
     /*pub fn set_sweep_lock(&mut self, lock:Area){
         *self.overlay_sweep_lock.as_ref().unwrap().borrow_mut() = lock;
     }

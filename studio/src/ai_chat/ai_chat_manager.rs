@@ -30,9 +30,9 @@ impl Default for AiChatManager{
                     }
                 },
                 AiModel{
-                    name: "gemini 2.0 pro".to_string(),
+                    name: "gemini 2.5 pro".to_string(),
                     backend: AiBackend::Google{
-                        url:"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-pro-exp-02-05:streamGenerateContent?alt=sse&key=".to_string(),
+                        url:"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-25:streamGenerateContent?alt=sse&key=".to_string(),
                         key:std::fs::read_to_string("GOOGLE_KEY").unwrap_or("".to_string())
                     }
                 },
@@ -57,70 +57,123 @@ impl Default for AiChatManager{
             ],
             contexts: vec![
                 BaseContext{
-                    name: "Chat".to_string(),
-                    apply: AiApply::PatchDSL,
-                    system_pre: live_id!(CHAT_PRE),
-                    system_post: live_id!(CHAT_POST),
-                    general_post: live_id!(CHAT_GENERAL),
-                    files: vec![]
-                },
-                BaseContext{
-                    name: "Rust".to_string(),
-                    apply: AiApply::PatchDSL,
-                    system_pre: live_id!(RUST_PRE),
-                    system_post: live_id!(RUST_POST),
-                    general_post: live_id!(RUST_GENERAL),
-                    files: vec![]
-                },
-                BaseContext{
-                    name: "Next".to_string(),
+                    name: "Makepad Game".to_string(),
                     apply: AiApply::WholeFile,
-                    system_pre: live_id!(NEXT_PRE),
-                    system_post: live_id!(NEXT_POST),
-                    general_post: live_id!(NEXT_GENERAL),
-                    files: vec![]
-                },
-                BaseContext{
-                    name: "Next All".to_string(),
-                    apply: AiApply::WholeFile,
-                    system_pre: live_id!(NEXT_ALL_PRE),
-                    system_post: live_id!(NEXT_ALL_POST),
-                    general_post: live_id!(NEXT_ALL_GENERAL),
-                    files: vec![]
-                },
-                BaseContext{
-                    name: "Next UI".to_string(),
-                    apply: AiApply::PatchDSL,
-                    system_pre: live_id!(FNEXT_UI_PRE),
-                    system_post: live_id!(NEXT_UI_POST),
-                    general_post: live_id!(NEXT_UI_GENERAL),
-                    files: vec![]
-                },
-                BaseContext{
-                    name: "Makepad All".to_string(),
-                    apply: AiApply::WholeFile,
-                    system_pre: live_id!(ALL_PRE),
-                    system_post: live_id!(ALL_POST),
+                    system_pre: live_id!(GAME_PRE),
+                    system_post: live_id!(GAME_POST),
                     general_post: live_id!(GENERAL_POST),
                     files: vec![
-                        AiContextFile::new("Example code","examples/ai_docs/src/app.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app2.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app3.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app4.rs"),
+                        AiContextFile::new("Snake game example","makepad/examples/snake/src/app.rs"),
                     ]
                 },
                 BaseContext{
-                    name: "Makepad UI".to_string(),
+                    name: "Makepad DSL".to_string(),
                     apply: AiApply::PatchDSL,
                     system_pre: live_id!(UI_PRE),
                     system_post: live_id!(UI_POST),
                     general_post: live_id!(GENERAL_POST),
                     files: vec![
-                        AiContextFile::new("Example code","examples/ai_docs/src/app.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app2.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app3.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app4.rs"),
+                        AiContextFile::new("News feed example","makepad/examples/news_feed/src/app.rs"),
+                        AiContextFile::new("Todo example","makepad/examples/todo/src/app.rs"),
+                        AiContextFile::new("Simple example","makepad/examples/simple/src/app.rs"),
+                        AiContextFile::new("Snake game example","makepad/examples/snake/src/app.rs"),
+                        AiContextFile::new("Slides viewer example","makepad/examples/slides/src/app.rs"),
                     ]
+                },
+                BaseContext{
+                    name: "Makepad DSL Long".to_string(),
+                    apply: AiApply::PatchDSL,
+                    system_pre: live_id!(UI_PRE),
+                    system_post: live_id!(UI_POST),
+                    general_post: live_id!(GENERAL_POST),
+                    files: vec![
+                        AiContextFile::new("News feed example","makepad/examples/news_feed/src/app.rs"),
+                        AiContextFile::new("Todo example","makepad/examples/todo/src/app.rs"),
+                        AiContextFile::new("Simple example","makepad/examples/simple/src/app.rs"),
+                        AiContextFile::new("Snake game example","makepad/examples/snake/src/app.rs"),
+                        AiContextFile::new("Slides viewer example","makepad/examples/slides/src/app.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/app.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/demofiletree.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/layout_templates.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/lib.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/main.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_button.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_checkbox.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_commandtextinput.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_desktopbutton.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_dropdown.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_filetree.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_foldbutton.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_html.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_icon.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_iconset.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_image.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_imageblend.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_label.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_layout.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_linklabel.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_markdown.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_pageflip.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_portallist.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_radiobutton.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_rotary.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_rotatedimage.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_scrollbar.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_slider.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_slidesview.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_textinput.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_view.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/tab_widgetsoverview.rs"),
+                        AiContextFile::new("UI Examples","makepad/examples/ui_zoo/src/uizoolayouts.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/button.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/check_box.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/dock.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/drop_down.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/expandable_panel.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/file_tree.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/flat_list.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/portal_list.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/html.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/image.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/image_cache.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/label.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/link_label.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/markdown.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/portal_list.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/radio_button.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/scroll_bar.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/scroll_bars.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/slider.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/slides_view.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/tab.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/tab_bar.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/tab_close_button.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/text_flow.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/text_input.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/theme_desktop_dark.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/view.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/view_ui.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/widget.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/widget_match_event.rs"),
+                        AiContextFile::new("Widget source","makepad/widgets/src/window.rs"),
+                    ]
+                },
+                BaseContext{
+                    name: "Makepad Rust".to_string(),
+                    apply: AiApply::WholeFile,
+                    system_pre: live_id!(ALL_PRE),
+                    system_post: live_id!(ALL_POST),
+                    general_post: live_id!(GENERAL_POST),
+                    files: vec![
+                    ]
+                },
+                BaseContext{
+                    name: "Chat".to_string(),
+                    apply: AiApply::None,
+                    system_pre: live_id!(CHAT_PRE),
+                    system_post: live_id!(CHAT_POST),
+                    general_post: live_id!(CHAT_GENERAL),
+                    files: vec![]
                 },
                 BaseContext{
                     name: "Makepad Internal".to_string(),
@@ -128,137 +181,133 @@ impl Default for AiChatManager{
                     system_pre: live_id!(INTERNAL_PRE),
                     system_post: live_id!(INTERNAL_POST),
                     general_post: live_id!(INTERNAL_GENERAL),
-                    files: vec![
-                        AiContextFile::new("Example code","examples/ai_docs/src/app.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app2.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app3.rs"),
-                        AiContextFile::new("Example code","examples/ai_docs/src/app4.rs"),                        
-                        AiContextFile::new("","platform/live_compiler/src/live_document.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_error.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_eval.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_expander.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_node.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_node_vec.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_parser.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_ptr.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_registry.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/live_token.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/span.rs"),
-                        AiContextFile::new("","platform/live_compiler/src/util.rs"),
+                    files: vec![                   
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_document.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_error.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_eval.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_expander.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_node.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_node_vec.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_parser.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_ptr.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_registry.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/live_token.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/span.rs"),
+                        AiContextFile::new("","makepad/platform/live_compiler/src/util.rs"),
                         
-                        AiContextFile::new("","platform/live_tokenizer/src/char_ext.rs"),
-                        AiContextFile::new("","platform/live_tokenizer/src/colorhex.rs"),
-                        AiContextFile::new("","platform/live_tokenizer/src/full_token.rs"),
-                        AiContextFile::new("","platform/live_tokenizer/src/live_error_origin.rs"),
-                        AiContextFile::new("","platform/live_tokenizer/src/tokenizer.rs"),
-                        AiContextFile::new("","platform/live_tokenizer/src/vec4_ext.rs"),
+                        AiContextFile::new("","makepad/platform/live_tokenizer/src/char_ext.rs"),
+                        AiContextFile::new("","makepad/platform/live_tokenizer/src/colorhex.rs"),
+                        AiContextFile::new("","makepad/platform/live_tokenizer/src/full_token.rs"),
+                        AiContextFile::new("","makepad/platform/live_tokenizer/src/live_error_origin.rs"),
+                        AiContextFile::new("","makepad/platform/live_tokenizer/src/tokenizer.rs"),
+                        AiContextFile::new("","makepad/platform/live_tokenizer/src/vec4_ext.rs"),
                         
-                        AiContextFile::new("","platform/shader_compiler/src/analyse.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/builtin.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/const_eval.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/const_gather.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/dep_analyse.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/generate.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/generate_glsl.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/generate_hlsl.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/generate_metal.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/lhs_check.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/shader_ast.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/shader_parser.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/shader_registry.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/swizzle.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/ty_check.rs"),
-                        AiContextFile::new("","platform/shader_compiler/src/util.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/analyse.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/builtin.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/const_eval.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/const_gather.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/dep_analyse.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/generate.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/generate_glsl.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/generate_hlsl.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/generate_metal.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/lhs_check.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/shader_ast.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/shader_parser.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/shader_registry.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/swizzle.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/ty_check.rs"),
+                        AiContextFile::new("","makepad/platform/shader_compiler/src/util.rs"),
                         
-                        AiContextFile::new("","platform/src/event/designer.rs"),
-                        AiContextFile::new("","platform/src/event/drag_drop.rs"),
-                        AiContextFile::new("","platform/src/event/event.rs"),
-                        AiContextFile::new("","platform/src/event/finger.rs"),
-                        AiContextFile::new("","platform/src/event/keyboard.rs"),
-                        AiContextFile::new("","platform/src/event/network.rs"),
-                        AiContextFile::new("","platform/src/event/video_playback.rs"),
-                        AiContextFile::new("","platform/src/event/window.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/designer.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/drag_drop.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/event.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/finger.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/keyboard.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/network.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/video_playback.rs"),
+                        AiContextFile::new("","makepad/platform/src/event/window.rs"),
                                                                         
-                        AiContextFile::new("","platform/src/action.rs"),
-                        AiContextFile::new("","platform/src/animator.rs"),
-                        AiContextFile::new("","platform/src/app_main.rs"),
-                        AiContextFile::new("","platform/src/area.rs"),
-                        AiContextFile::new("","platform/src/cx.rs"),
-                        AiContextFile::new("","platform/src/cx_api.rs"),
-                        AiContextFile::new("","platform/src/debug.rs"),
+                        AiContextFile::new("","makepad/platform/src/action.rs"),
+                        AiContextFile::new("","makepad/platform/src/animator.rs"),
+                        AiContextFile::new("","makepad/platform/src/app_main.rs"),
+                        AiContextFile::new("","makepad/platform/src/area.rs"),
+                        AiContextFile::new("","makepad/platform/src/cx.rs"),
+                        AiContextFile::new("","makepad/platform/src/cx_api.rs"),
+                        AiContextFile::new("","makepad/platform/src/debug.rs"),
                         
-                        AiContextFile::new("","platform/src/draw_list.rs"),
-                        AiContextFile::new("","platform/src/draw_shader.rs"),
-                        AiContextFile::new("","platform/src/draw_vars.rs"),
+                        AiContextFile::new("","makepad/platform/src/draw_list.rs"),
+                        AiContextFile::new("","makepad/platform/src/draw_shader.rs"),
+                        AiContextFile::new("","makepad/platform/src/draw_vars.rs"),
                         
-                        AiContextFile::new("","platform/src/file_dialogs.rs"),
-                        AiContextFile::new("","platform/src/geometry.rs"),
-                        AiContextFile::new("","platform/src/gpu_info.rs"),
-                        AiContextFile::new("","platform/src/id_pool.rs"),
-                        AiContextFile::new("","platform/src/live_atomic.rs"),
-                        AiContextFile::new("","platform/src/live_cx.rs"),
-                        AiContextFile::new("","platform/src/live_prims.rs"),
-                        AiContextFile::new("","platform/src/live_traits.rs"),
-                        AiContextFile::new("","platform/src/log.rs"),
-                        AiContextFile::new("","platform/src/pass.rs"),
-                        AiContextFile::new("","platform/src/scope.rs"),
-                        AiContextFile::new("","platform/src/studio.rs"),
-                        AiContextFile::new("","platform/src/texture.rs"),
-                        AiContextFile::new("","platform/src/thread.rs"),
-                        AiContextFile::new("","platform/src/ui_runner.rs"),
-                        AiContextFile::new("","platform/src/video.rs"),
-                        AiContextFile::new("","platform/src/web_socket.rs"),
-                        AiContextFile::new("","platform/src/window.rs"),
+                        AiContextFile::new("","makepad/platform/src/file_dialogs.rs"),
+                        AiContextFile::new("","makepad/platform/src/geometry.rs"),
+                        AiContextFile::new("","makepad/platform/src/gpu_info.rs"),
+                        AiContextFile::new("","makepad/platform/src/id_pool.rs"),
+                        AiContextFile::new("","makepad/platform/src/live_atomic.rs"),
+                        AiContextFile::new("","makepad/platform/src/live_cx.rs"),
+                        AiContextFile::new("","makepad/platform/src/live_prims.rs"),
+                        AiContextFile::new("","makepad/platform/src/live_traits.rs"),
+                        AiContextFile::new("","makepad/platform/src/log.rs"),
+                        AiContextFile::new("","makepad/platform/src/pass.rs"),
+                        AiContextFile::new("","makepad/platform/src/scope.rs"),
+                        AiContextFile::new("","makepad/platform/src/studio.rs"),
+                        AiContextFile::new("","makepad/platform/src/texture.rs"),
+                        AiContextFile::new("","makepad/platform/src/thread.rs"),
+                        AiContextFile::new("","makepad/platform/src/ui_runner.rs"),
+                        AiContextFile::new("","makepad/platform/src/video.rs"),
+                        AiContextFile::new("","makepad/platform/src/web_socket.rs"),
+                        AiContextFile::new("","makepad/platform/src/window.rs"),
                         
-                        AiContextFile::new("","draw/src/cx_2d.rs"),
-                        AiContextFile::new("","draw/src/draw_list_2d.rs"),
+                        AiContextFile::new("","makepad/draw/src/cx_2d.rs"),
+                        AiContextFile::new("","makepad/draw/src/draw_list_2d.rs"),
                         
-                        AiContextFile::new("","draw/src/match_event.rs"),
-                        AiContextFile::new("","draw/src/nav.rs"),
-                        AiContextFile::new("","draw/src/overlay.rs"),
-                        AiContextFile::new("","draw/src/shader/draw_color.rs"),
-                        AiContextFile::new("","draw/src/shader/draw_quad.rs"),
-                        AiContextFile::new("","draw/src/shader/draw_text.rs"),
-                        AiContextFile::new("","draw/src/turtle.rs"),
-                        AiContextFile::new("","widgets/src/button.rs"),
-                        AiContextFile::new("","widgets/src/check_box.rs"),
-                        AiContextFile::new("","widgets/src/dock.rs"),
-                        AiContextFile::new("","widgets/src/drop_down.rs"),
-                        AiContextFile::new("","widgets/src/expandable_panel.rs"),
-                        AiContextFile::new("","widgets/src/file_tree.rs"),
-                        AiContextFile::new("","widgets/src/flat_list.rs"),
-                        AiContextFile::new("","widgets/src/portal_list.rs"),
-                        AiContextFile::new("","widgets/src/html.rs"),
-                        AiContextFile::new("","widgets/src/image.rs"),
-                        AiContextFile::new("","widgets/src/image_cache.rs"),
-                        AiContextFile::new("","widgets/src/label.rs"),
-                        AiContextFile::new("","widgets/src/link_label.rs"),
-                        AiContextFile::new("","widgets/src/markdown.rs"),
-                        AiContextFile::new("","widgets/src/portal_list.rs"),
-                        AiContextFile::new("","widgets/src/radio_button.rs"),
-                        AiContextFile::new("","widgets/src/scroll_bar.rs"),
-                        AiContextFile::new("","widgets/src/scroll_bars.rs"),
-                        AiContextFile::new("","widgets/src/slider.rs"),
-                        AiContextFile::new("","widgets/src/slides_view.rs"),
-                        AiContextFile::new("","widgets/src/tab.rs"),
-                        AiContextFile::new("","widgets/src/tab_bar.rs"),
-                        AiContextFile::new("","widgets/src/tab_close_button.rs"),
-                        AiContextFile::new("","widgets/src/text_flow.rs"),
-                        AiContextFile::new("","widgets/src/text_input.rs"),
-                        AiContextFile::new("","widgets/src/theme_desktop_dark.rs"),
-                        AiContextFile::new("","widgets/src/view.rs"),
-                        AiContextFile::new("","widgets/src/view_ui.rs"),
-                        AiContextFile::new("","widgets/src/widget.rs"),
-                        AiContextFile::new("","widgets/src/widget_match_event.rs"),
-                        AiContextFile::new("","widgets/src/window.rs"),
-                        AiContextFile::new("","widgets/src/designer.rs"),
-                        AiContextFile::new("","widgets/src/designer_data.rs"),
-                        AiContextFile::new("","widgets/src/designer_dummy.rs"),
-                        AiContextFile::new("","widgets/src/designer_outline.rs"),
-                        AiContextFile::new("","widgets/src/designer_outline_tree.rs"),
-                        AiContextFile::new("","widgets/src/designer_theme.rs"),
-                        AiContextFile::new("","widgets/src/designer_toolbox.rs"),
-                        AiContextFile::new("","widgets/src/designer_view.rs"),
+                        AiContextFile::new("","makepad/draw/src/match_event.rs"),
+                        AiContextFile::new("","makepad/draw/src/nav.rs"),
+                        AiContextFile::new("","makepad/draw/src/overlay.rs"),
+                        AiContextFile::new("","makepad/draw/src/shader/draw_color.rs"),
+                        AiContextFile::new("","makepad/draw/src/shader/draw_quad.rs"),
+                        AiContextFile::new("","makepad/draw/src/shader/draw_text.rs"),
+                        AiContextFile::new("","makepad/draw/src/turtle.rs"),
+                        AiContextFile::new("","makepad/widgets/src/button.rs"),
+                        AiContextFile::new("","makepad/widgets/src/check_box.rs"),
+                        AiContextFile::new("","makepad/widgets/src/dock.rs"),
+                        AiContextFile::new("","makepad/widgets/src/drop_down.rs"),
+                        AiContextFile::new("","makepad/widgets/src/expandable_panel.rs"),
+                        AiContextFile::new("","makepad/widgets/src/file_tree.rs"),
+                        AiContextFile::new("","makepad/widgets/src/flat_list.rs"),
+                        AiContextFile::new("","makepad/widgets/src/portal_list.rs"),
+                        AiContextFile::new("","makepad/widgets/src/html.rs"),
+                        AiContextFile::new("","makepad/widgets/src/image.rs"),
+                        AiContextFile::new("","makepad/widgets/src/image_cache.rs"),
+                        AiContextFile::new("","makepad/widgets/src/label.rs"),
+                        AiContextFile::new("","makepad/widgets/src/link_label.rs"),
+                        AiContextFile::new("","makepad/widgets/src/markdown.rs"),
+                        AiContextFile::new("","makepad/widgets/src/portal_list.rs"),
+                        AiContextFile::new("","makepad/widgets/src/radio_button.rs"),
+                        AiContextFile::new("","makepad/widgets/src/scroll_bar.rs"),
+                        AiContextFile::new("","makepad/widgets/src/scroll_bars.rs"),
+                        AiContextFile::new("","makepad/widgets/src/slider.rs"),
+                        AiContextFile::new("","makepad/widgets/src/slides_view.rs"),
+                        AiContextFile::new("","makepad/widgets/src/tab.rs"),
+                        AiContextFile::new("","makepad/widgets/src/tab_bar.rs"),
+                        AiContextFile::new("","makepad/widgets/src/tab_close_button.rs"),
+                        AiContextFile::new("","makepad/widgets/src/text_flow.rs"),
+                        AiContextFile::new("","makepad/widgets/src/text_input.rs"),
+                        AiContextFile::new("","makepad/widgets/src/theme_desktop_dark.rs"),
+                        AiContextFile::new("","makepad/widgets/src/view.rs"),
+                        AiContextFile::new("","makepad/widgets/src/view_ui.rs"),
+                        AiContextFile::new("","makepad/widgets/src/widget.rs"),
+                        AiContextFile::new("","makepad/widgets/src/widget_match_event.rs"),
+                        AiContextFile::new("","makepad/widgets/src/window.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_data.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_dummy.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_outline.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_outline_tree.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_theme.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_toolbox.rs"),
+                        AiContextFile::new("","makepad/widgets/src/designer_view.rs"),
                     ],
                 },
             ],
@@ -268,17 +317,17 @@ impl Default for AiChatManager{
                     files:vec![]
                 },
                 AiProject{
-                    name:"makepad-example-simple".to_string(),
+                    name:"makepad-experiment-ai-snake".to_string(),
                     files:vec![
-                        AiContextFile::new("Main app to rewrite","examples/simple/src/app.rs")
+                        AiContextFile::new("Main app to rewrite","ai_snake/src/app.rs")
                     ]
                 },
                 AiProject{
-                    name:"makepad-portal-list".to_string(),
+                    name:"makepad-experiment-ai-mr".to_string(),
                     files:vec![
-                        AiContextFile::new("","widgets/src/portal_list2.rs")
+                        AiContextFile::new("Main app to rewrite","ai_mr/src/app.rs")
                     ]
-                }
+                },
             ]
         }
     }
@@ -343,11 +392,6 @@ pub enum AiContext{
 
 #[derive(Default, Debug, SerRon, DeRon, Clone)]
 pub struct AiUserMessage{
-    pub auto_run: bool,
-    pub model: String,
-    pub project: String,
-    pub base_context: String,
-    pub context: Vec<AiContext>,
     pub message:String
 }
 
@@ -358,8 +402,13 @@ pub enum AiChatMessage{
 }
 
 
-#[derive(Debug, SerRon, DeRon, Clone)]
+#[derive(Debug, SerRon, DeRon, Clone,)]
 pub struct AiChatMessages{
+    pub context: Vec<AiContext>,
+    pub auto_run: bool,
+    pub model: String,
+    pub project: String,
+    pub base_context: String,
     pub last_time: f64,
     pub messages: Vec<AiChatMessage>
 }
@@ -368,30 +417,19 @@ impl AiChatMessages{
     fn new()->Self{
         AiChatMessages{
             last_time: 0.0,
+            auto_run: true,
+            model: "".to_string(),
+            project: "".to_string(),
+            base_context: "".to_string(),
+            context: vec![],
             messages: vec![AiChatMessage::User(AiUserMessage::default())],
         }
     }
     
     fn follow_up(&mut self){
-        if let Some(AiChatMessage::User(usr)) = self.messages.iter().rev().nth(1).cloned(){
-            let next = if usr.base_context == "Makepad UI"{
-                "Next UI"
-            }
-            else if usr.base_context == "Makepad All"{
-                "Next All"
-            }
-            else{
-                "Next"
-            };
-            self.messages.push(AiChatMessage::User(AiUserMessage{
-                auto_run: usr.auto_run,
-                model: usr.model.clone(),
-                project: usr.project.clone(),
-                base_context: next.to_string(),
-                context: vec![],
-                message:"".to_string()
-            }));
-        }
+       self.messages.push(AiChatMessage::User(AiUserMessage{
+            message:"".to_string()
+        }));
     }
 }
 
@@ -485,37 +523,25 @@ impl AiChatFile{
         // 
     }
     
-    pub fn set_base_context(&mut self, history_slot:usize, at:usize, base_context:&str){ 
-        if let AiChatMessage::User(s) = &mut self.history[history_slot].messages[at]{
-            s.base_context = base_context.to_string()
-        }
-        else{panic!()}
+    pub fn set_base_context(&mut self, history_slot:usize, base_context:&str){ 
+        self.history[history_slot].base_context = base_context.to_string()
     }
     
-    pub fn set_model(&mut self, history_slot:usize, at:usize, model:&str){ 
-        if let AiChatMessage::User(s) = &mut self.history[history_slot].messages[at]{
-            s.model = model.to_string()
-        }
-        else{panic!()}
+    pub fn set_model(&mut self, history_slot:usize, model:&str){ 
+        self.history[history_slot].model = model.to_string()
     }
     
-    pub fn set_project(&mut self, history_slot:usize, at:usize, project:&str){ 
-        if let AiChatMessage::User(s) = &mut self.history[history_slot].messages[at]{
-            s.project = project.to_string()
-        }
-        else{panic!()}
+    pub fn set_project(&mut self, history_slot:usize, project:&str){ 
+        self.history[history_slot].project = project.to_string()
     }
     
-    pub fn set_auto_run(&mut self, history_slot:usize, at:usize, auto_run:bool){ 
-        if let AiChatMessage::User(s) = &mut self.history[history_slot].messages[at]{
-            s.auto_run = auto_run
-        }
-        else{panic!()}
+    pub fn set_auto_run(&mut self, history_slot:usize,  auto_run:bool){ 
+        self.history[history_slot].auto_run = auto_run
     }
         
 }
 
-const AI_PROMPT_FILE:&'static str = "studio/resources/ai/ai_markup.txt";
+const AI_PROMPT_FILE:&'static str = "makepad/studio/resources/ai/ai_markup.txt";
 
 impl AiChatManager{
     pub fn init(&mut self, fs:&mut FileSystem) {
@@ -594,8 +620,7 @@ impl AiChatManager{
                                     }
                                 }
                                 AiBackend::Google{..}=>{
-                                    println!("GOT {:?}", data);
-                                    for data in data.split("\n\n"){
+                                    for data in data.split("\r\n\r\n"){
                                         if let Some(data) = data.strip_prefix("data: "){
                                             match GoogleAiResponse::deserialize_json(&data){
                                                 Ok(response)=>{
@@ -646,7 +671,7 @@ impl AiChatManager{
                                         
                                     }
                                     // alright so we're done.. check if we have run-when-done
-                                    doc.file.history[in_flight.history_slot].follow_up();
+                                    //doc.file.history[in_flight.history_slot].follow_up();
                                                                        
                                     //self.redraw_ai_chat_by_id(cx, chat_id, ui, fs);
                                     //fs.request_save_file_for_file_node_id(chat_id, false);
@@ -663,52 +688,51 @@ impl AiChatManager{
     
     pub fn run_ai_chat(&self, cx:&mut Cx, chat_id:LiveId, history_slot:usize, item_id:usize, fs:&mut FileSystem){
         if let Some(OpenDocument::AiChat(doc)) = fs.open_documents.get(&chat_id){
-            let usr = doc.file.history[history_slot].messages.iter().nth(item_id);
-            let ast = doc.file.history[history_slot].messages.iter().nth(item_id+1);
+            let messages = &doc.file.history[history_slot];
+            let ast = messages.messages.iter().nth(item_id);
+            let usr = messages.messages.iter().nth(item_id.saturating_sub(1));
+                        
             if let Some(AiChatMessage::Assistant(ast)) = ast.cloned(){
-                if let Some(AiChatMessage::User(usr)) = usr.cloned(){
-                    
-                    // lets check the project and the mode
-                    println!("{:?}", usr);
-                    
-                    if let Some(project) = self.projects.iter().find(|v| v.name == usr.project){
-                        if let Some(first) = project.files.get(0){
-                            //let file_path =  "examples/simple/src/app.rs";
-                            let file_id = fs.path_to_file_node_id(&first.path).unwrap();
-                            //let old_data = fs.file_id_as_string(file_id).unwrap();
-                            if let Some(new_data) = ast.strip_prefix("```rust"){
-                                if let Some(new_data) = new_data.strip_suffix("```"){
-                                    // alright depending
-                                    if let Some(ctx) = self.contexts.iter().find(|v| v.name == usr.base_context){
-                                        match ctx.apply{
-                                            AiApply::PatchDSL=>{
-                                                fs.replace_live_design(
-                                                    cx,
-                                                    file_id,
-                                                    &new_data
-                                                );
-                                                fs.request_save_file_for_file_node_id(file_id, false);
-                                                /*
-                                                fs.process_possible_live_reload(
-                                                    cx,
-                                                    &first.path,
-                                                    &old_data,
-                                                    &new_data,
-                                                    false
-                                                );*/
-                                            }
-                                            AiApply::WholeFile=>{
-                                                fs.replace_code_document(file_id, new_data);
-                                                fs.request_save_file_for_file_node_id(file_id, false);
-                                            }
-                                            _=>()
+                if let Some(project) = self.projects.iter().find(|v| v.name == messages.project){
+                    if let Some(first) = project.files.get(0){
+                        //let file_path =  "makepad/examples/simple/src/app.rs";
+                        let file_id = fs.path_to_file_node_id(&first.path).unwrap();
+                        //let old_data = fs.file_id_as_string(file_id).unwrap();
+                        if let Some(new_data) = ast.strip_prefix("```rust"){
+                            if let Some(new_data) = new_data.strip_suffix("```"){
+                                // alright depending
+                                // go set the snapshot textbox
+                                if let Some(AiChatMessage::User(usr)) = usr.cloned(){
+                                    cx.action(AppAction::SetSnapshotMessage{message:usr.message.clone()});
+                                }
+                                if let Some(ctx) = self.contexts.iter().find(|v| v.name == messages.base_context){
+                                    match ctx.apply{
+                                        AiApply::PatchDSL=>{
+                                            fs.replace_live_design(
+                                                cx,
+                                                file_id,
+                                                &new_data
+                                            );
+                                            fs.request_save_file_for_file_node_id(file_id, false);
+                                            /*
+                                            fs.process_possible_live_reload(
+                                                cx,
+                                                &first.path,
+                                                &old_data,
+                                                &new_data,
+                                                false
+                                            );*/
                                         }
+                                        AiApply::WholeFile=>{
+                                            fs.replace_code_document(file_id, new_data);
+                                            fs.request_save_file_for_file_node_id(file_id, false);
+                                        }
+                                        _=>()
                                     }
                                 }
                             }
                         }
                     }
-                    
                 }
             }
         }
@@ -731,13 +755,8 @@ impl AiChatManager{
         // build the request
         let (request,backend) = if let Some(OpenDocument::AiChat(doc)) = fs.open_documents.get(&chat_id){
             // alright lets fetch which backend we want
-            let ai_model = if let Some(AiChatMessage::User(msg)) = doc.file.history[history_slot].messages.last(){
-                if let Some(backend) = self.models.iter().find(|v| v.name == msg.model){
-                    backend
-                }
-                else{
-                    self.models.first().unwrap()
-                }
+            let ai_model = if let Some(backend) = self.models.iter().find(|v| v.name == doc.file.history[history_slot].model){
+                backend
             }
             else{
                 self.models.first().unwrap()
@@ -750,60 +769,59 @@ impl AiChatManager{
                     request.set_header("Authorization".to_string(), format!("Bearer {key}"));
                     request.set_header("Content-Type".to_string(), "application/json".to_string());
                     request.set_metadata_id(chat_id); 
-                    let mut messages = Vec::new();
-                    for msg in &doc.file.history[history_slot].messages{
-                        match msg{
-                            AiChatMessage::User(v)=>{
-                                let doc = fs.file_path_as_string(AI_PROMPT_FILE).unwrap();
-                                // parse it as html
-                                let html = makepad_html::parse_html(&doc, &mut None, InternLiveId::No);
-                                let html = html.new_walker();
-                                
-                                
-                                // alright. we have to now collect our base context files
-                                // ok lets find these files
-                                let mut system_post = LiveId(0);
-                                let mut general_post = LiveId(0);
-                                                                
-                                if let Some(ctx) = self.contexts.iter().find(|ctx| ctx.name == v.base_context){
-                                    // alright lets fetch things
-                                    system_post = ctx.system_post;
-                                    general_post = ctx.general_post;
-                                    
-                                    if let Some(text) = html.find_tag_text(ctx.system_pre){
-                                        messages.push(OpenAiChatMessage {content: Some(text.to_string()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
-                                    }
-                                        
-                                    for file in &ctx.files{
-                                        if let Some(file_id) = fs.path_to_file_node_id(&file.path){
-                                            if let Some(OpenDocument::Code(doc)) = fs.open_documents.get(&file_id){
-                                                let mut content = String::new();
-                                                let text = doc.as_text().to_string();
-                                                content.push_str(&format!("\n Now follows a context file with description: ```{}``` given as context to help generating correct code. The filename is ```{}```\n",file.kind, file.path));
-                                                content.push_str("```rust\n");
-                                                content.push_str(&text);
-                                                content.push_str("```\n");
-                                                 messages.push(OpenAiChatMessage {content: Some(content), role: Some("user".to_string()), refusal: Some(JsonValue::Null)})
-                                            }
-                                        }
-                                    }
+                    let mut out_messages = Vec::new();
+                    
+                    let messages = &doc.file.history[history_slot];
+                    
+                    let ai_html = fs.file_path_as_string(AI_PROMPT_FILE).unwrap();
+                    let html = makepad_html::parse_html(&ai_html, &mut None, InternLiveId::No);
+                    let html = html.new_walker();
+                    
+                    // alright lets plug in the context 'head'
+                    
+                    if let Some(ctx) = self.contexts.iter().find(|ctx| ctx.name == messages.base_context){
+                        // alright lets fetch things
+                                                            
+                        if let Some(text) = html.find_tag_text(ctx.system_pre){
+                            out_messages.push(OpenAiChatMessage {content: Some(text.to_string()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
+                        }
+                                              
+                        for file in &ctx.files{
+                            if let Some(file_id) = fs.path_to_file_node_id(&file.path){
+                                if let Some(OpenDocument::Code(doc)) = fs.open_documents.get(&file_id){
+                                    let mut content = String::new();
+                                    let text = doc.as_text().to_string();
+                                    content.push_str(&format!("\n Now follows a context file with description: ```{}``` given as context to help generating correct code. The filename is ```{}```\n",file.kind, file.path));
+                                    content.push_str("```rust\n");
+                                    content.push_str(&text);
+                                    content.push_str("```\n");
+                                    out_messages.push(OpenAiChatMessage {content: Some(content), role: Some("user".to_string()), refusal: Some(JsonValue::Null)})
                                 }
-                                messages.push(OpenAiChatMessage {content: Some(v.message.clone()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
-                                
-                                if let Some(text) = html.find_tag_text(system_post){
-                                    messages.push(OpenAiChatMessage {content: Some(text.to_string()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
-                                }
-                                if let Some(text) = html.find_tag_text(general_post){
-                                    messages.push(OpenAiChatMessage {content: Some(text.to_string()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
-                                }
-                            }
-                            AiChatMessage::Assistant(v)=>{
-                                messages.push(OpenAiChatMessage {content: Some(v.clone()), role: Some("assistant".to_string()), refusal: Some(JsonValue::Null)})
                             }
                         }
+                        
+                        if let Some(text) = html.find_tag_text(ctx.system_post){
+                            out_messages.push(OpenAiChatMessage {content: Some(text.to_string()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
+                        }                      
+                        
+                        for msg in &messages.messages{
+                            match msg{
+                                AiChatMessage::User(v)=>{
+                                    out_messages.push(OpenAiChatMessage {content: Some(v.message.clone()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
+                                }
+                                AiChatMessage::Assistant(v)=>{
+                                    out_messages.push(OpenAiChatMessage {content: Some(v.clone()), role: Some("assistant".to_string()), refusal: Some(JsonValue::Null)})
+                                }
+                            }
+                        }
+                        
+                        if let Some(text) = html.find_tag_text(ctx.general_post){
+                            out_messages.push(OpenAiChatMessage {content: Some(text.to_string()), role: Some("user".to_string()), refusal: Some(JsonValue::Null)});
+                        }
                     }
+                    
                     request.set_json_body(OpenAiChatPrompt {
-                        messages,
+                        messages: out_messages,
                         model: model.to_string(),
                         reasoning_effort:reasoning_effort.clone(),
                         max_tokens: 10000,
@@ -817,110 +835,90 @@ impl AiChatManager{
                     request.set_header("Content-Type".to_string(), "application/json".to_string());
                     request.set_metadata_id(chat_id); 
                     let mut contents = Vec::new();
-                    for msg in &doc.file.history[history_slot].messages{
-                        match msg{
-                            AiChatMessage::User(v)=>{
-                                let doc = fs.file_path_as_string(AI_PROMPT_FILE).unwrap();
-                                // parse it as html
-                                let html = makepad_html::parse_html(&doc, &mut None, InternLiveId::No);
-                                let html = html.new_walker();
-                                
-                                // alright. we have to now collect our base context files
-                                // ok lets find these files
-                                let mut system_post = LiveId(0);
-                                let mut general_post = LiveId(0);
-                                                                                                
-                                if let Some(ctx) = self.contexts.iter().find(|ctx| ctx.name == v.base_context){
-                                    // alright lets fetch things
-                                    system_post = ctx.system_post;
-                                    general_post = ctx.general_post;
-                                                                        
-                                    if let Some(text) = html.find_tag_text(ctx.system_pre){
-                                        contents.push(GoogleAiContent {
-                                            parts: vec![GoogleAiPart{
-                                                text:text.to_string()
-                                            }],
-                                            role: Some("user".to_string()), 
-                                        });
-                                    }
-                                    
-                                    let mut parts = Vec::new();
-                                                                            
-                                    for file in &ctx.files{
-                                        if let Some(file_id) = fs.path_to_file_node_id(&file.path){
-                                            if let Some(OpenDocument::Code(doc)) = fs.open_documents.get(&file_id){
-                                                let mut content = String::new();
-                                                let text = doc.as_text().to_string();
-                                                content.push_str(&format!("The following is given as context to help generating correct code. The filename is ```{}```\n", file.path));
-                                                content.push_str("```rust\n");
-                                                content.push_str(&text);
-                                                content.push_str("```\n");
-                                                parts.push(GoogleAiPart{
-                                                    text:content.to_string()
-                                                })
-                                                
-                                            }
-                                        }
-                                    }
-                                    if let Some(ctx) = self.projects.iter().find(|ctx| ctx.name == v.project){
-                                        for file in &ctx.files{
-                                            if let Some(file_id) = fs.path_to_file_node_id(&file.path){
-                                                if let Some(OpenDocument::Code(doc)) = fs.open_documents.get(&file_id){
-                                                    let mut content = String::new();
-                                                    let text = doc.as_text().to_string();
-                                                    content.push_str(&format!("The following is part the code to work on. The filename is ```{}```\n", file.path));
-                                                    content.push_str("```rust\n");
-                                                    content.push_str(&text);
-                                                    content.push_str("```\n");
-                                                    parts.push(GoogleAiPart{
-                                                        text:content.to_string()
-                                                    })
-                                                }
-                                            }
-                                        }
-                                    }
-                                    contents.push(GoogleAiContent {
-                                        parts,
-                                        role: Some("user".to_string()), 
-                                    });
+                    
+                    let messages = &doc.file.history[history_slot];
+                                        
+                    let ai_html = fs.file_path_as_string(AI_PROMPT_FILE).unwrap();
+                    // parse it as html
+                    let html = makepad_html::parse_html(&ai_html, &mut None, InternLiveId::No);
+                    let html = html.new_walker();
+                    
+                    if let Some(ctx) = self.contexts.iter().find(|ctx| ctx.name == messages.base_context){
+                            
+                        if let Some(text) = html.find_tag_text(ctx.system_pre){
+                            contents.push(GoogleAiContent {
+                                parts: vec![GoogleAiPart{
+                                    text:text.to_string()
+                                }],
+                                role: Some("user".to_string()), 
+                            });
+                        }
+                                                                    
+                        let mut parts = Vec::new();
+                        for file in &ctx.files{
+                            if let Some(file_id) = fs.path_to_file_node_id(&file.path){
+                                if let Some(OpenDocument::Code(doc)) = fs.open_documents.get(&file_id){
+                                    let mut content = String::new();
+                                    let text = doc.as_text().to_string();
+                                    content.push_str(&format!("The following is given as context to help generating correct code. The filename is ```{}```\n", file.path));
+                                    content.push_str("```rust\n");
+                                    content.push_str(&text);
+                                    content.push_str("```\n");
+                                    parts.push(GoogleAiPart{
+                                        text:content.to_string()
+                                    })
                                 }
-                                contents.push(GoogleAiContent {
-                                    parts: vec![GoogleAiPart{
-                                        text:v.message.clone()
-                                    }],
-                                    role: Some("user".to_string()), 
-                                });
-                                                                
-                                if let Some(text) = html.find_tag_text(system_post){
-                                    contents.push(GoogleAiContent {
-                                        parts: vec![GoogleAiPart{
-                                            text:text.to_string()
-                                        }],
-                                        role: Some("user".to_string()), 
-                                    });
-                                }
-                                if let Some(text) = html.find_tag_text(general_post){
-                                    contents.push(GoogleAiContent {
-                                        parts: vec![GoogleAiPart{
-                                            text:text.to_string()
-                                        }],
-                                        role: Some("user".to_string()), 
-                                    });
-                                }
-                            }
-                            AiChatMessage::Assistant(v)=>{
-                                contents.push(GoogleAiContent {
-                                    parts: vec![GoogleAiPart{
-                                        text:v.to_string()
-                                    }],
-                                    role: Some("model".to_string()), 
-                                });
                             }
                         }
+                        
+                        contents.push(GoogleAiContent {
+                            parts,
+                            role: Some("user".to_string()), 
+                        });
+                                                                                                
+                        if let Some(text) = html.find_tag_text(ctx.system_post){
+                            contents.push(GoogleAiContent {
+                                parts: vec![GoogleAiPart{
+                                    text:text.to_string()
+                                }],
+                                role: Some("user".to_string()), 
+                            });
+                        }
+                        
+                        for msg in &messages.messages{
+                            match msg{
+                                AiChatMessage::User(v)=>{
+                                    contents.push(GoogleAiContent {
+                                        parts: vec![GoogleAiPart{
+                                            text:v.message.clone()
+                                        }],
+                                        role: Some("user".to_string()), 
+                                    });
+                                }
+                                AiChatMessage::Assistant(v)=>{
+                                    contents.push(GoogleAiContent {
+                                        parts: vec![GoogleAiPart{
+                                            text:v.to_string()
+                                        }],
+                                        role: Some("model".to_string()), 
+                                    });
+                                }
+                            }
+                        }
+                        
+                        if let Some(text) = html.find_tag_text(ctx.general_post){
+                            contents.push(GoogleAiContent {
+                                parts: vec![GoogleAiPart{
+                                    text:text.to_string()
+                                }],
+                                role: Some("user".to_string()), 
+                            });
+                        }
                     }
-                    request.set_json_body(GoogleAiChatPrompt {
+                    let contents = GoogleAiChatPrompt {
                         contents,
-                    });
+                    };
+                    request.set_json_body(contents);
                     (request, ai_model.backend.clone())
                 }
             }

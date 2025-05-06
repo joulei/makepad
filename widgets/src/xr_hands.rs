@@ -17,20 +17,18 @@ live_design!{
 
         draw_bullet:{
             color: #0 
+            
             fn get_color(self, dp: float)->vec4{
                 let ambient = vec3(0.2,0.2,0.2) 
                 let color = self.color.xyz * dp * self.color.w + ambient;
-                return mix(#1100,#4440,self.life);
+                return vec4(Pal::iq1(self.life-self.time+self.index*0.1)*1.0,0.0);//mix(#f00,#4440,3*self.life);
             }
             fn get_size(self)->vec3{
-                return self.cube_size * self.data
-            }
-            fn get_size(self)->vec3{
-                let size = max(3.0-(self.life),0.0)/4.0;
-                return self.cube_size * size;
+                let size = pow(max(3.0-(self.life),0.0)/4.0,1.);
+                return self.cube_size * size*vec3(0.1,1.2*sin(self.life),(6-self.index+1)*1.0);
             }
             fn get_pos(self)->vec3{
-                let travel = self.life * 0.25;
+                let travel = self.life * 0.4;
                 return vec3(0.0, 0.0, -travel)
             }
             cube_size:vec3(0.01,0.01,0.015);
@@ -69,6 +67,7 @@ live_design!{
 
 struct Bullet{
     shot_at: f64,
+    index: usize,
     pose: Pose,
 }
 #[derive(Default)]
@@ -79,8 +78,25 @@ struct Bullets{
 
 pub struct XrPeer{
     id: LiveId,
-    state: XrState,
+    ahead: bool,
+    min_lag: f64,
+    states: Vec<XrState>,
     bullets: Bullets
+}
+
+impl XrPeer{
+    fn state(&self)->&XrState{
+        self.states.last().as_ref().unwrap()        
+    }
+    fn tween(&self, _host_time:f64)->XrState{
+        // TODO do frame tweening/prediction/packet smoothing
+        if self.states.len()>=2{
+            self.states[0].clone()
+        }
+        else{
+            self.states[0].clone()
+        }
+    }
 }
 
 impl Bullets{
@@ -88,7 +104,7 @@ impl Bullets{
         if xr_state.time < self.last_fired{ // we rejoined
             self.last_fired = xr_state.time;
         }
-        if xr_state.time - self.last_fired > 0.01 {
+        if xr_state.time - self.last_fired > 0.005 {
             for hand in xr_state.hands(){
                 if !hand.in_view(){
                     continue
@@ -99,6 +115,7 @@ impl Bullets{
                     self.last_fired = xr_state.time;
                     self.bullets.push(Bullet{
                         shot_at: xr_state.time,
+                        index: i,
                         pose:**pose
                     });
                     if self.bullets.len()>4500{
@@ -109,7 +126,7 @@ impl Bullets{
         }
         for bullet in &self.bullets{
             let mat = Mat4::mul(&bullet.pose.to_mat4(), anchor_map);
-
+            cube.index = bullet.index as f32;
             cube.life = (xr_state.time - bullet.shot_at) as f32;
             cube.transform = mat;
             cube.depth_clip = 1.0;
@@ -145,24 +162,30 @@ pub struct XrHands {
 
 impl XrHands{
     
-    pub fn join_peer(&mut self, _cx:&mut Cx, id:LiveId, state:XrState){
-        if let Some(peer) = self.peers.iter_mut().find(|v| v.id == id){
-            if state.order_counter>peer.state.order_counter ||
-               peer.state.order_counter - state.order_counter>128{
-                peer.state = state;
-            }
-        }
-        else{
-            self.peers.push(XrPeer{id, state, bullets:Bullets::default()});
-        }
-    }
-        
     pub fn leave_peer(&mut self, _cx:&mut Cx, id:LiveId){
         self.peers.retain(|v| v.id != id);
     }
         
-    pub fn update_peer(&mut self, cx:&mut Cx, id:LiveId, state:XrState){
-        self.join_peer(cx, id, state);
+    pub fn update_peer(&mut self, _cx:&mut Cx, id:LiveId, state:XrState, e:&XrUpdateEvent){
+        if let Some(peer) = self.peers.iter_mut().find(|v| v.id == id){
+            peer.ahead = state.time > e.state.time;
+            peer.min_lag = peer.min_lag.min((state.time - e.state.time).abs());
+            let peer_state = peer.state();
+            if state.order_counter>peer_state.order_counter ||
+            peer_state.order_counter - state.order_counter>128{
+                peer.states.insert(0, state);
+            }
+            peer.states.truncate(2);
+        }
+        else{
+            self.peers.push(XrPeer{
+                id, 
+                ahead: false,
+                min_lag: 1.0,
+                states: vec![state], 
+                bullets:Bullets::default()
+            });
+        }
     }
     
     fn handle_alignment(&mut self, cx:&mut Cx, e:&XrUpdateEvent){
@@ -332,33 +355,30 @@ impl Widget for XrHands {
         let xr_state = cx.draw_event.xr_state.as_ref().unwrap();
         
         self.draw_alignment(cx, xr_state);
-        /*
-        if let Some(align)= &self.align_mode{
-            draw_democube(cx, &mut self.draw_test, &align.anchor);
-        }*/
             
         draw_hands(cx, &mut self.draw_knuckle, &mut self.draw_tip, &Mat4::identity(), &xr_state);
         
+        //let dt = profile_start();
         self.bullets.draw(cx, &mut self.draw_bullet, &xr_state, &Mat4::identity());
         
         for peer in &mut self.peers{
-            
-            if let Some(other_anchor) = &peer.state.anchor{
+            let peer_state = peer.tween(xr_state.time);
+            if let Some(other_anchor) = &peer_state.anchor{
                 if let Some(my_anchor) = &xr_state.anchor{
                     // alright we need a mapping mat4 from 2 anchors
                     let anchor_map = other_anchor.mapping_to(my_anchor);
-                    draw_hands(cx, &mut self.draw_knuckle, &mut self.draw_tip, &anchor_map, &peer.state);
+                    draw_hands(cx, &mut self.draw_knuckle, &mut self.draw_tip, &anchor_map, &peer_state);
                     
-                    draw_head(cx, &mut self.draw_head, &anchor_map, &peer.state);
+                    draw_head(cx, &mut self.draw_head, &anchor_map, &peer_state);
                                         
-                    peer.bullets.draw(cx, &mut self.draw_bullet, &peer.state, &anchor_map)
+                    peer.bullets.draw(cx, &mut self.draw_bullet, &peer_state, &anchor_map)
                 }
             }
             else{
-                draw_hands(cx, &mut self.draw_knuckle, &mut self.draw_tip, &Mat4::identity(), &peer.state)
+                draw_hands(cx, &mut self.draw_knuckle, &mut self.draw_tip, &Mat4::identity(), &peer_state)
             }
         }
-                
+        //profile_end!(dt);         
         self.draw_list.end(cx);
         DrawStep::done()
     }

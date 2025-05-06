@@ -8,9 +8,12 @@ use crate::{
     makepad_widgets::file_tree::*,
     makepad_platform::os::cx_stdin::*,
     makepad_file_protocol::SearchItem,
+    makepad_file_server::FileSystemRoots,
     file_system::file_system::*,
     studio_editor::*,
     run_view::*,
+    snapshot::*,
+    studio_file_tree::*,
     makepad_platform::studio::{JumpToFile,EditFile, SelectInFile, PatchFile, SwapSelection},
     log_list::*,
     makepad_code_editor::{CodeSession,text::{Position}},
@@ -26,6 +29,7 @@ use crate::{
 use std::fs::File;
 use std::io::Write;
 use std::env;
+
 live_design!{
     use crate::app_ui::*;
     use link::widgets::*;
@@ -42,20 +46,10 @@ pub struct App {
     #[live] pub ui: WidgetRef,
     #[rust] pub data: AppData,
 }
-
+ 
 impl LiveRegister for App{
     fn live_register(cx: &mut Cx) {
-        crate::makepad_widgets::live_design(cx);
-        crate::makepad_code_editor::live_design(cx);
-        crate::run_list::live_design(cx);
-        crate::log_list::live_design(cx);
-        crate::profiler::live_design(cx);
-        crate::run_view::live_design(cx);
-        crate::studio_editor::live_design(cx);
-        crate::studio_file_tree::live_design(cx);
-        crate::app_ui::live_design(cx);
-        crate::ai_chat::ai_chat_view::live_design(cx);
-        crate::search::live_design(cx);
+        crate::live_design(cx);
         // for macos
         cx.start_stdin_service();
     }
@@ -65,11 +59,10 @@ app_main!(App);
 
 impl App {
      
-    
     pub fn open_code_file_by_path(&mut self, cx: &mut Cx, path: &str) {
         if let Some(file_id) = self.data.file_system.path_to_file_node_id(&path) {
             let dock = self.ui.dock(id!(dock));            
-            let tab_id = dock.unique_tab_id(file_id.0);
+            let tab_id = dock.unique_id(file_id.0);
             self.data.file_system.request_open_file(tab_id, file_id);
             let (tab_bar, pos) = dock.find_tab_bar_of_tab(live_id!(edit_first)).unwrap();
             // lets pick the template
@@ -163,7 +156,9 @@ pub enum AppAction{
     StartRecompile,
     ReloadFileTree,
     RecompileStarted,
+    RedrawSnapshots,
     ClearLog, 
+    SetSnapshotMessage{message:String},
     SendAiChatToBackend{chat_id:LiveId, history_slot:usize},
     CancelAiGeneration{chat_id:LiveId},
     SaveAiChat{chat_id:LiveId},
@@ -175,18 +170,31 @@ pub enum AppAction{
 
 impl MatchEvent for App{
     fn handle_startup(&mut self, cx:&mut Cx){
-        let mut root = "./".to_string();
+        let mut roots = Vec::new();
+        let current_dir = env::current_dir().unwrap();
+        
         for arg in std::env::args(){
             if let Some(prefix) = arg.strip_prefix("--root="){
-                root = prefix.to_string();
-                break;
+                for root in prefix.split(","){
+                    let mut parts = root.splitn(2,":");
+                    let base = parts.next().expect("name:path expected");
+                    let path = parts.next().expect("name:path expected");
+                    let dir = current_dir.clone();
+                    roots.push((base.to_string(), dir.join(path).canonicalize().unwrap()));
+                }
+            }
+            else{
             }
         }
-        let root_path = env::current_dir().unwrap().join(root);
-                
-        self.data.file_system.init(cx, &root_path);
-        self.data.build_manager.init(cx, &root_path);
-        
+        if roots.is_empty(){
+            let dir1 = current_dir.join("./").canonicalize().unwrap();
+            //roots.push(("ai_snake".to_string(),current_dir.join("../snapshots/ai_snake").canonicalize().unwrap()));
+            roots.push(("makepad".to_string(),dir1));
+            //roots.push(("experiments".to_string(),current_dir.join("../experiments").canonicalize().unwrap()));
+        }
+        let roots = FileSystemRoots{roots};
+        self.data.file_system.init(cx, roots.clone());
+        self.data.build_manager.init(cx, roots);
                 
         //self.data.build_manager.discover_external_ip(cx);
         self.data.build_manager.start_http_server();
@@ -195,11 +203,12 @@ impl MatchEvent for App{
     
     fn handle_action(&mut self, cx:&mut Cx, action:&Action){
         let dock = self.ui.dock(id!(dock));
-        let file_tree = self.ui.view(id!(file_tree));
+        let file_tree = self.ui.studio_file_tree(id!(file_tree));
         let log_list = self.ui.log_list(id!(log_list));
         let run_list = self.ui.view(id!(run_list_tab));
         let profiler = self.ui.view(id!(profiler));
         let search = self.ui.view(id!(search));
+        let snapshot = self.ui.snapshot(id!(snapshot_tab));
         
         match action.cast(){
             AppAction::SwapSelection(ss)=>{
@@ -279,7 +288,7 @@ impl MatchEvent for App{
                     }
                     else{
                         // lets open the editor
-                        let tab_id = dock.unique_tab_id(file_id.0);
+                        let tab_id = dock.unique_id(file_id.0);
                         self.data.file_system.request_open_file(tab_id, file_id);
                         // lets add a file tab 'somewhere'
                         let (tab_bar, pos) = dock.find_tab_bar_of_tab(live_id!(edit_first)).unwrap();
@@ -362,7 +371,7 @@ impl MatchEvent for App{
                 profiler.redraw(cx);
             }
             AppAction::ReloadFileTree=>{
-                self.data.file_system.reload_file_tree();
+                self.data.file_system.file_client.load_file_tree();
             }
             AppAction::RedrawProfiler=>{
                 profiler.redraw(cx);
@@ -424,6 +433,12 @@ impl MatchEvent for App{
                 dock.close_tab(cx, run_view_id.add(2));
                 dock.redraw(cx);
                 log_list.redraw(cx);
+            }
+            AppAction::SetSnapshotMessage{message}=>{
+                snapshot.set_message(cx, message);
+            }
+            AppAction::RedrawSnapshots=>{
+                snapshot.redraw(cx);
             }
         }
                 
@@ -498,7 +513,9 @@ impl MatchEvent for App{
                 file_tree.redraw(cx);
                 self.load_state(cx, 0);
                 self.data.ai_chat_manager.init(&mut self.data.file_system);
-                //self.open_code_file_by_path(cx, "examples/slides/src/app.rs");
+            }
+            FileSystemAction::SnapshotImageLoaded => {
+                snapshot.redraw(cx);
             }
             FileSystemAction::RecompileNeeded => {
                 self.data.build_manager.start_recompile_timer(cx);
@@ -519,7 +536,7 @@ impl MatchEvent for App{
         
         if let Some(action) = action.as_widget_action(){
             match action.cast(){
-                CodeEditorAction::UnhandledKeyDown(ke) if ke.key_code == KeyCode::F12=>{
+                CodeEditorAction::UnhandledKeyDown(ke) if ke.key_code == KeyCode::F12 && !ke.modifiers.shift =>{
                     if let Some(word) = self.data.file_system.get_word_under_cursor_for_session(action.path.from_end(1)){
                         dock.select_tab(cx, live_id!(search));
                         let set = vec![SearchItem{
@@ -535,8 +552,20 @@ impl MatchEvent for App{
                             pre_word_boundary:true,
                             post_word_boundary:true
                         }];
-                        search.text_input(id!(search_input)).set_text(cx, word);
-                        //search.text_input(id!(search_input)).set_text(cx, &set.iter().map(|v| v.needle.clone()).collect::<Vec<String>>().join("\\b|"));
+                        search.text_input(id!(search_input)).set_text(cx, &word);
+                        self.data.file_system.search_string(cx, set);
+                    } 
+                },
+                CodeEditorAction::UnhandledKeyDown(ke) if ke.key_code == KeyCode::F12 && ke.modifiers.shift =>{
+                    if let Some(word) = self.data.file_system.get_word_under_cursor_for_session(action.path.from_end(1)){
+                        dock.select_tab(cx, live_id!(search));
+                        let set = vec![SearchItem{
+                            needle:word.clone(), 
+                            prefixes: None,
+                            pre_word_boundary:ke.modifiers.control,
+                            post_word_boundary:ke.modifiers.control
+                        }];
+                        search.text_input(id!(search_input)).set_text(cx, &word);
                         self.data.file_system.search_string(cx, set);
                     } 
                 },
@@ -578,7 +607,7 @@ impl MatchEvent for App{
                     if let DragItem::FilePath {path, internal_id} = &drop_event.items[0] {
                         if let Some(internal_id) = internal_id { // from inside the dock
                             if drop_event.modifiers.logo {
-                                let tab_id = dock.unique_tab_id(internal_id.0);
+                                let tab_id = dock.unique_id(internal_id.0);
                                 dock.drop_clone(cx, drop_event.abs, *internal_id, tab_id, live_id!(CloseableTab));
                             }
                             else {
@@ -588,7 +617,7 @@ impl MatchEvent for App{
                         }
                         else { // external file, we have to create a new tab
                             if let Some(file_id) = self.data.file_system.path_to_file_node_id(&path) {
-                                let tab_id = dock.unique_tab_id(file_id.0);
+                                let tab_id = dock.unique_id(file_id.0);
                                 self.data.file_system.request_open_file(tab_id, file_id);
                                 let template = FileSystem::get_editor_template_from_path(&path);
                                 dock.drop_create(cx, drop_event.abs, tab_id, template, "".to_string(), live_id!(CloseableTab));
@@ -650,13 +679,12 @@ impl MatchEvent for App{
         }
             
         if let Some(file_id) = file_tree.file_clicked(&actions) {
-            println!("FILE CLICKED");
             // ok lets open the file
             if let Some(tab_id) = self.data.file_system.file_node_id_to_tab_id(file_id) {
                 // If the tab is already open, focus it
                 dock.select_tab(cx, tab_id);
             } else {
-                let tab_id = dock.unique_tab_id(file_id.0);
+                let tab_id = dock.unique_id(file_id.0);
                 self.data.file_system.request_open_file(tab_id, file_id);
                 self.data.file_system.request_open_file(tab_id, file_id);
                                 

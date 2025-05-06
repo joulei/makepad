@@ -110,7 +110,7 @@ live_design!{
             content = {
                 spacing: (THEME_SPACE_2)
                 align: { y: 0.5 }
-                search_input = <TextInput> {
+                search_input = <TextInputFlat> {
                     width: Fill,
                     empty_text: "Search",
                 }
@@ -227,7 +227,6 @@ impl Widget for Search {
         if let Event::Actions(actions) = event{
             if let Some(search) = self.view.text_input(id!(search_input)).changed(&actions){
                 let mut set = Vec::new();
-                
                 for item in search.split("|"){
                     if let Some(item) = item.strip_suffix("\\b"){
                         if let Some(item) = item.strip_prefix("\\b"){

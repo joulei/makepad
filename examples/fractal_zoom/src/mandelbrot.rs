@@ -8,7 +8,7 @@ use {
 // Our live DSL to define the shader and UI def
 live_design!{
     // include shader standard library with the Pal object
-    use makepad_draw::shader::std::*;
+    use link::shaders::*;
     
     // the shader to draw the texture tiles
     DrawTile = {{DrawTile}} {
@@ -29,13 +29,13 @@ live_design!{
             }
             // fetch a color using iq2 (inigo quilez' shadertoy palette #2)
             //return mix(#f00,#ff0,self.pos.y);
-            return vec4(Pal::iq2(index - self.color_cycle*-1.0),1);
+            return vec4(Pal::iq1(index - self.color_cycle*-1.0),1);
             
         }
     }
     
-    Mandelbrot = {{Mandelbrot}} {
-        max_iter: 256,
+    pub Mandelbrot = {{Mandelbrot}} {
+        max_iter: 2560,
     }
 }
 
@@ -173,7 +173,7 @@ impl TileCache {
     
     fn tile_completed(&mut self, cx: &mut Cx, mut tile: Tile) {
         self.tiles_in_flight -= 1;
-        self.textures[tile.texture_index].put_back_vec_u32(cx, &mut tile.buffer, None);
+        self.textures[tile.texture_index].swap_vec_u32(cx, &mut tile.buffer);
         self.next.push(tile)
     }
     

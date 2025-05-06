@@ -3,7 +3,6 @@ pub mod app;
 pub mod layout_templates;
 pub mod demofiletree;
 
-pub mod tab_adaptiveview;
 pub mod tab_button;
 pub mod tab_checkbox;
 pub mod tab_commandtextinput;
@@ -11,7 +10,6 @@ pub mod tab_desktopbutton;
 pub mod tab_dropdown;
 pub mod tab_filetree;
 pub mod tab_foldbutton;
-pub mod tab_foldheader;
 pub mod tab_html;
 pub mod tab_icon;
 pub mod tab_iconset;

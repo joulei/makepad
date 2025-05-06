@@ -4,7 +4,7 @@ use crate::{
     makepad_draw::*,
     widget::*
 };
-
+use std::sync::Arc;
 use std::path::{Path, PathBuf};
 
 live_design!{
@@ -97,6 +97,7 @@ pub struct Image {
     #[live(ImageAnimation::BounceFps(25.0))] animation: ImageAnimation,
     #[rust] last_time: Option<f64>,
     #[rust] animation_frame: f64,
+    #[visible] #[live(true)] visible: bool,
     #[rust] next_frame: NextFrame,
     #[live] fit: ImageFit,
     #[live] source: LiveDependency,
@@ -267,6 +268,9 @@ impl Image {
     }
 
     pub fn draw_walk(&mut self, cx: &mut Cx2d, mut walk: Walk) -> DrawStep {
+        if !self.visible{
+            return DrawStep::done()
+        }
         // alright we get a walk. depending on our aspect ratio
         // we change either nothing, or width or height
         let rect = cx.peek_walk_turtle(walk);
@@ -357,6 +361,23 @@ impl Image {
         }
         Ok(())
     }    
+    pub fn load_image_from_data_async(&mut self, cx: &mut Cx, image_path: &Path, data: Arc<Vec<u8>>) -> Result<(), ImageError> {
+        if let Ok(result) = self.load_image_from_data_async_impl(cx, image_path, data, 0){
+            match result{
+                AsyncLoadResult::Loading(w,h)=>{
+                    self.async_image_size = Some((w,h));
+                    self.async_image_path = Some(image_path.into());
+                    self.animator_play(cx, id!(async_load.on));
+                    self.redraw(cx);
+                }
+                AsyncLoadResult::Loaded=>{
+                    self.redraw(cx);
+                }
+            }
+            // lets set the w-h
+        }
+        Ok(())
+    }
 }
 
 pub enum AsyncLoad{
@@ -390,7 +411,14 @@ impl ImageRef {
         }
         Ok(())
     }    
-    
+            
+    /// Loads the image at the given `image_path` on disk into this `ImageRef`.
+    pub fn load_image_from_data_async(&self, cx: &mut Cx,  image_path: &Path, data:Arc<Vec<u8>>) -> Result<(), ImageError> {
+        if let Some(mut inner) = self.borrow_mut() {
+            return inner.load_image_from_data_async(cx, image_path, data)
+        }
+        Ok(())
+    }    
     
     /// Loads a JPEG into this `ImageRef` by decoding the given encoded JPEG `data`.
     pub fn load_jpg_from_data(&self, cx: &mut Cx, data: &[u8]) -> Result<(), ImageError> {

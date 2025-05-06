@@ -10,12 +10,11 @@ live_design!{
 
     pub DemoIcon = <UIZooTabLayout_B> {
         desc = {
-            <H3> { text: "<Icon>"}
+            <Markdown> { body: dep("crate://self/resources/icon.md") } 
         }
         demos = {
             <H4> { text: "Standard" }
             <Icon> {
-                icon_walk: { width: 100.  }
                 draw_icon: { svg_file: dep("crate://self/resources/Icon_Favorite.svg"), }
             }
 
@@ -31,6 +30,21 @@ live_design!{
             <IconGradientY> {
                 icon_walk: { width: 100.  }
                 draw_icon: { svg_file: dep("crate://self/resources/Icon_Favorite.svg"), }
+            }
+
+            <H4> { text: "Styling Attributes Reference" }
+            <Icon> {
+                width: Fit,
+                height: Fit,
+
+                icon_walk: {
+                    width: 50.
+                    margin: 10.
+                }
+
+                draw_bg: { color: #0 }
+                draw_icon: { color: #f0f }
+                draw_icon: { svg_file: dep("crate://self/resources/Icon_Favorite.svg") }
             }
         }
     }

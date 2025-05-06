@@ -1,12 +1,16 @@
 use {
     std::collections::{HashMap, hash_map},
-    std::path::Path,
+    std::path::{Path,PathBuf},
+    std::sync::Arc,
+    std::cell::RefCell,
     crate::{
         makepad_code_editor::{CodeDocument, decoration::{Decoration, DecorationSet}, CodeSession},
         makepad_platform::makepad_live_compiler::LiveFileChange,
+        app::AppAction,
         makepad_widgets::*,
         makepad_widgets::file_tree::*,
         file_system::FileClient,
+        makepad_file_server::FileSystemRoots,
         ai_chat::ai_chat_manager::AiChatDocument,
         makepad_file_protocol::{
             SearchResult,
@@ -18,6 +22,8 @@ use {
             FileNotification,
             FileNodeData,
             FileTreeData,
+            GitLog,
+            GitCommit,
             SaveKind,
             SaveFileResponse
         },
@@ -27,16 +33,68 @@ use {
 #[derive(Default)]
 pub struct FileSystem {
     pub file_client: FileClient,
-    pub root_path: String,
     pub file_nodes: LiveIdMap<LiveId, FileNode>,
     pub path_to_file_node_id: HashMap<String, LiveId>,
     pub tab_id_to_file_node_id: HashMap<LiveId, LiveId>,
     pub tab_id_to_session: HashMap<LiveId, EditSession>,
     pub open_documents: HashMap<LiveId, OpenDocument>,
-    
+    pub git_logs: Vec<GitLog>,
+    pub snapshot_image_data: RefCell<HashMap<String, SnapshotImageData>>,
     pub search_results_id: u64,
-    pub search_results: Vec<SearchResult>
+    pub search_results: Vec<SearchResult>,
+    pub snapshot_creation: SnapshotCreation
 }
+
+pub enum SnapshotCreation{
+    Idle,
+    Started{message:String},
+    ReceivedImage{root:String, message:String, data:Option<Vec<u8>>},
+    ReceivedHash{hash: String, message:String}
+}
+impl Default for SnapshotCreation{
+    fn default()->Self{SnapshotCreation::Idle}
+}
+impl SnapshotCreation{
+    fn handle_image(&mut self, cx:&mut Cx, file_client:&mut FileClient, git_logs:&mut Vec<GitLog>, root:String, data:Vec<u8> ){
+        if let Self::ReceivedHash{hash, message} = self{
+            file_client.send_request(FileRequest::SaveSnapshotImage {root:root.to_string(), hash:hash.clone(), data});
+            if let Some(git_log) = git_logs.iter_mut().find(|v| v.root == root){
+                git_log.commits.insert(0, GitCommit{
+                    hash: hash.clone(),
+                    message:message.clone()
+                });
+                cx.action(AppAction::RedrawSnapshots);
+            }
+            *self = Self::Idle
+        }
+        else if let Self::Started{message} = self{
+            *self = Self::ReceivedImage{root, data:Some(data), message:message.clone()}
+        }
+    }
+    fn handle_hash(&mut self, cx:&mut Cx, file_client:&mut FileClient, git_logs:&mut Vec<GitLog>, hash:String){
+        if let Self::ReceivedImage{root, data, message} = self{
+            file_client.send_request(FileRequest::SaveSnapshotImage {root:root.clone(),  hash: hash.clone(), data: data.take().unwrap()});
+            if let Some(git_log) = git_logs.iter_mut().find(|v| v.root == *root){
+                git_log.commits.insert(0, GitCommit{
+                    hash: hash,
+                    message:message.clone()
+                });
+                cx.action(AppAction::RedrawSnapshots);
+            }
+            *self = Self::Idle
+        }
+        else if let Self::Started{message} = self{
+            *self = Self::ReceivedHash{hash, message:message.clone()}
+        }
+    }
+}
+
+pub enum SnapshotImageData{
+    Loading,
+    Error,
+    Loaded{data:Arc<Vec<u8>>, path:PathBuf}
+}
+
 
 pub enum EditSession {
     Code(CodeSession),
@@ -75,6 +133,7 @@ pub enum FileSystemAction {
     RecompileNeeded,
     LiveReloadNeeded(LiveFileChange),
     FileChangedOnDisk(SaveFileResponse),
+    SnapshotImageLoaded,
     SearchResults,
     None
 }
@@ -101,8 +160,47 @@ impl FileSystem {
             _=>live_id!(edit_first),
         }
     }
+         
+            
+    pub fn load_file_tree(&self) {
+        self.file_client.send_request(FileRequest::LoadFileTree {with_data: false});
+    }
         
+    pub fn load_snapshot(&mut self, root:String, hash:String) {
+        self.file_client.send_request(FileRequest::LoadSnapshot {root:root, hash});                
+    }
     
+    pub fn create_snapshot(&mut self, root:String, message:String) {
+        self.snapshot_creation = SnapshotCreation::Started{message: message.clone()};
+        self.file_client.send_request(FileRequest::CreateSnapshot {root:root, message});                
+    }
+            
+    pub fn load_snapshot_image(&self, root:&str, hash:&str) {
+        let mut image_data = self.snapshot_image_data.borrow_mut();
+        if image_data.get(hash).is_none(){
+            image_data.insert(root.to_string(), SnapshotImageData::Loading);
+            self.file_client.send_request(FileRequest::LoadSnapshotImage {root:root.to_string(), hash:hash.to_string()});
+        }
+        
+    }
+    
+    pub fn save_snapshot_image(&mut self, cx:&mut Cx, root:&str, hash:&str, width:usize, height: usize, data:Vec<u8>) {
+        let mut jpeg = Vec::new();
+        let encoder = jpeg_encoder::Encoder::new(&mut jpeg, 100);
+        encoder.encode(&data, width as u16, height as u16, jpeg_encoder::ColorType::Bgra).unwrap();
+        
+        let mut image_data = self.snapshot_image_data.borrow_mut();
+        if image_data.get(hash).is_none(){
+            
+            self.snapshot_creation.handle_image(cx, &mut self.file_client, &mut self.git_logs, root.to_string(), jpeg.clone());
+            
+            image_data.insert(root.to_string(), SnapshotImageData::Loaded{
+                data: Arc::new(jpeg),
+                path: Path::new(hash).with_extension("jpg")
+            });
+        }   
+    }
+            
     pub fn get_editor_template_from_file_id(&self, file_id:LiveId)->Option<LiveId>{
         if let Some(path) = self.file_node_id_to_path(file_id){
             Some(Self::get_editor_template_from_path(path))
@@ -112,9 +210,9 @@ impl FileSystem {
         }
     }
     
-    pub fn init(&mut self, cx: &mut Cx, path:&Path) {
-        self.file_client.init(cx, path);
-        self.reload_file_tree();
+    pub fn init(&mut self, cx: &mut Cx, roots:FileSystemRoots) {
+        self.file_client.init(cx, roots);
+        self.file_client.load_file_tree();
     }
     
     pub fn search_string(&mut self, _cx:&mut Cx, set:Vec<SearchItem>){
@@ -125,10 +223,6 @@ impl FileSystem {
             set
         });
         //cx.action( FileSystemAction::SearchResults );
-    }
-    
-    pub fn reload_file_tree(&mut self) {
-        self.file_client.send_request(FileRequest::LoadFileTree {with_data: false});
     }
     
     pub fn remove_tab(&mut self, tab_id: LiveId) {
@@ -197,10 +291,45 @@ impl FileSystem {
             while let Ok(message) = self.file_client.inner.as_mut().unwrap().message_receiver.try_recv() {
                 match message {
                     FileClientMessage::Response(response) => match response {
+                        FileResponse::CreateSnapshot(response)=>{
+                            match response{
+                                Ok(res)=>{
+                                    self.snapshot_creation.handle_hash(cx, &mut self.file_client,  &mut self.git_logs, res.hash);
+                                }
+                                Err(res)=>{
+                                    crate::log!("ERROR {:?}", res);
+                                }
+                            }
+                        }
                         FileResponse::SearchInProgress(_)=>{
                         }
+                        FileResponse::SaveSnapshotImage(_)=>{
+                        }
+                        FileResponse::LoadSnapshot(res)=>{
+                            if let Err(e) = res{
+                                crate::log!("Error loading snapshot {:?}", e);
+                            }
+                        }
+                        FileResponse::LoadSnapshotImage(response)=>{
+                            // lets store this in our snapshot cache
+                            match response{
+                                Ok(res)=>{
+                                    let path = Path::new(&res.hash).to_path_buf().with_extension("jpg");
+                                    self.snapshot_image_data.borrow_mut().insert(res.hash, 
+                                        SnapshotImageData::Loaded{
+                                            data:Arc::new(res.data),
+                                            path
+                                        });
+                                    cx.action( FileSystemAction::SnapshotImageLoaded);
+                                }
+                                Err(res)=>{
+                                    self.snapshot_image_data.borrow_mut().insert(res.hash, SnapshotImageData::Error);
+                                    cx.action( FileSystemAction::SnapshotImageLoaded);
+                                }
+                            }
+                        }
                         FileResponse::LoadFileTree(response) => {
-                            self.load_file_tree(response.unwrap());
+                            self.process_load_file_tree(response.unwrap());
                             cx.action(FileSystemAction::TreeLoaded)
                             // dock.select_tab(cx, dock, state, live_id!(file_tree).into(), live_id!(file_tree).into(), Animate::No);
                         }
@@ -232,6 +361,8 @@ impl FileSystem {
                                     dock.redraw(cx);
                                 }
                                 Err(FileError::CannotOpen(_unix_path)) => {
+                                }
+                                Err(FileError::RootNotFound(_unix_path)) => {
                                 }
                                 Err(FileError::Unknown(err)) => {
                                     log!("File error unknown {}", err);
@@ -401,14 +532,18 @@ impl FileSystem {
             Some(_) | None=>DecorationSet::new()
         };
         
-        let template = self.get_editor_template_from_file_id(file_id).unwrap();
+        let template = self.get_editor_template_from_file_id(file_id);
         
         match template{
-            live_id!(CodeEditor)=>{
+            Some(live_id!(CodeEditor))=>{
                 self.open_documents.insert(file_id, OpenDocument::CodeLoading(dec));
             }
-            live_id!(AiChat)=>{
+            Some(live_id!(AiChat))=>{
                 self.open_documents.insert(file_id, OpenDocument::AiChatLoading);
+            }
+            None=>{
+                error!("File id {:?} does not have a template", file_id);
+                return
             }
             _=>panic!()
         }
@@ -524,15 +659,22 @@ impl FileSystem {
         };
     }
     
-    pub fn draw_file_node(&self, cx: &mut Cx2d, file_node_id: LiveId, file_tree: &mut FileTree) {
+    pub fn draw_file_node(&self, cx: &mut Cx2d, file_node_id: LiveId, level: usize, file_tree: &mut FileTree) {
         if let Some(file_node) = self.file_nodes.get(&file_node_id) {
             match &file_node.child_edges {
                 Some(child_edges) => {
-                    if file_tree.begin_folder(cx, file_node_id, &file_node.name).is_ok() {
+                    if level == 0{
                         for child_edge in child_edges {
-                            self.draw_file_node(cx, child_edge.file_node_id, file_tree);
+                            self.draw_file_node(cx, child_edge.file_node_id, level + 1, file_tree);
                         }
-                        file_tree.end_folder();
+                    }
+                    else{
+                        if file_tree.begin_folder(cx, file_node_id, &file_node.name).is_ok() {
+                            for child_edge in child_edges {
+                                self.draw_file_node(cx, child_edge.file_node_id, level + 1, file_tree);
+                            }
+                            file_tree.end_folder();
+                        }
                     }
                 }
                 None => {
@@ -547,7 +689,7 @@ impl FileSystem {
     }
     
     pub fn file_node_path(&self, file_node_id: LiveId) -> String {
-        let mut path = self.root_path.clone();
+        let mut path = String::new();
         let mut file_node = &self.file_nodes[file_node_id];
         while let Some(edge) = &file_node.parent_edge {
             path.insert_str(0, &edge.name);
@@ -639,7 +781,7 @@ impl FileSystem {
         
     }
     
-    pub fn load_file_tree(&mut self, tree_data: FileTreeData) {
+    pub fn process_load_file_tree(&mut self, tree_data: FileTreeData) {
         fn create_file_node(
             file_node_id: Option<LiveId>,
             node_path: String,
@@ -647,7 +789,9 @@ impl FileSystem {
             file_nodes: &mut LiveIdMap<LiveId, FileNode>,
             parent_edge: Option<FileEdge>,
             node: FileNodeData,
+            git_logs: &mut Vec<GitLog>
         ) -> LiveId {
+
             let file_node_id = file_node_id.unwrap_or(LiveId::from_str(&node_path).into());
             let name = parent_edge.as_ref().map_or_else(
                 || String::from("root"),
@@ -657,7 +801,10 @@ impl FileSystem {
                 parent_edge,
                 name,
                 child_edges: match node {
-                    FileNodeData::Directory {entries} => Some(
+                    FileNodeData::Directory {entries, git_log} => Some({
+                        if let Some(git_log) = git_log{
+                            git_logs.push(git_log);
+                        }
                         entries
                             .into_iter()
                             .map( | entry | FileEdge {
@@ -677,10 +824,11 @@ impl FileSystem {
                                     file_node_id,
                                 }),
                                 entry.node,
+                                git_logs,
                             ),
                         })
-                            .collect::<Vec<_ >> (),
-                    ),
+                            .collect::<Vec<_ >> ()
+                    }),
                     FileNodeData::File {..} => None,
                 },
             };
@@ -689,11 +837,8 @@ impl FileSystem {
             file_node_id
         }
         
-        self.root_path = tree_data.root_path;
-        
-        
         self.file_nodes.clear();
-        
+        self.git_logs.clear();
         create_file_node(
             Some(live_id!(root).into()),
             "".to_string(),
@@ -701,6 +846,7 @@ impl FileSystem {
             &mut self.file_nodes,
             None,
             tree_data.root,
+            &mut self.git_logs
         );
     }
 }

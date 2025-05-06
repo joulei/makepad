@@ -8,15 +8,13 @@
         use makepad_widgets::vectorline::*;
         use crate::layout_templates::*;
 
-        use crate::tab_adaptiveview::*;
         use crate::tab_button::*;
         use crate::tab_checkbox::*;
-        use crate::tab_commandtextinput::*;
-        use crate::tab_desktopbutton::*;
+        // use crate::tab_commandtextinput::*;
+        // use crate::tab_desktopbutton::*;
         use crate::tab_dropdown::*;
         use crate::tab_filetree::*;
-        use crate::tab_foldheader::*;
-        use crate::tab_foldbutton::*;
+        // use crate::tab_foldbutton::*;
         use crate::tab_html::*;
         use crate::tab_icon::*;
         use crate::tab_iconset::*;
@@ -46,8 +44,6 @@
             spacing: 0.
         }
 
-        <H3> { draw_bg: {color: #f00}}
-                            
         App = {{App}} {
             ui: <Window> {
                 width: Fill, height: Fill,
@@ -70,31 +66,6 @@
                     spacing: 0.,
                     margin: 0.,
 
-                    <View> {
-                        width: Fill,
-                        height: 40.
-                        spacing: (THEME_SPACE_2)
-                        flow: Right,
-
-                        padding: <THEME_MSPACE_2> {}
-                        margin: 0.
-                        show_bg: true,
-                        draw_bg: { color: (THEME_COLOR_U_1) }
-
-                        <SliderRound> { text: "Spacing"}
-                        <Vr> {}
-                        <Pbold> { width: Fit, text: "Color", padding: { top: 1.5}}
-                        <SliderRound> { text: "Contrast" }
-                        <SliderRound> { text: "Tint Factor" }
-                        <Vr> {}
-                        <Pbold> { width: Fit, text: "Font", padding: { top: 1.5}}
-                        <SliderRound> { text: "Scale" }
-                        <SliderRound> { text: "Contrast"}
-                        <Vr> {}
-                        <Toggle> { text: "Label Hover"}
-                        <Toggle> { text: "Light Theme"}
-                    }
-
                     dock = <Dock> {
                         height: Fill, width: Fill
 
@@ -114,15 +85,13 @@
                             tabs: [
                                 tOverview,
                                 tLayoutDemos,
-                                tAdaptiveView,
                                 tButton,
                                 tCheckBox,
-                                tCommandTextInput,
-                                tDesktopButton,
+                                // tCommandTextInput,
+                                // tDesktopButton,
                                 tDropDown,
                                 tFiletree,
-                                tFoldButton,
-                                tFoldHeader,
+                                // tFoldButton,
                                 tHTML,
                                 tIcon,
                                 tIconSet,
@@ -146,17 +115,15 @@
                             selected: 0
                         }
 
-                        tOverview = Tab { name: "Widgetset Overview", template: PermanentTab, kind: TabOverview }
+                        tOverview = Tab { name: "Intro", template: PermanentTab, kind: TabOverview }
                         tLayoutDemos = Tab { name: "Layout Demos", template: PermanentTab, kind: TabLayoutDemos }
-                        tAdaptiveView = Tab { name: "Adaptive View", template: PermanentTab, kind: TabAdaptiveView }
                         tButton = Tab { name: "Button", template: PermanentTab, kind: TabButton }
                         tCheckBox = Tab { name: "CheckBox", template: PermanentTab, kind: TabCheckBox }
-                        tCommandTextInput = Tab { name: "CommandTextInput", template: PermanentTab, kind: TabCommandTextInput }
-                        tDesktopButton = Tab { name: "DesktopButton", template: PermanentTab, kind: TabDesktopButton }
+                        // tCommandTextInput = Tab { name: "CommandTextInput", template: PermanentTab, kind: TabCommandTextInput }
+                        // tDesktopButton = Tab { name: "DesktopButton", template: PermanentTab, kind: TabDesktopButton }
                         tDropDown = Tab { name: "DropDown & PopupMenu", template: PermanentTab, kind: TabDropDown }
                         tFiletree = Tab { name: "FileTree", template: PermanentTab, kind: TabFiletree }
-                        tFoldButton = Tab { name: "FoldButton", template: PermanentTab, kind: TabFoldButton }
-                        tFoldHeader = Tab { name: "FoldHeader", template: PermanentTab, kind: TabFoldHeader }
+                        // tFoldButton = Tab { name: "FoldButton", template: PermanentTab, kind: TabFoldButton }
                         tHTML = Tab { name: "HTML", template: PermanentTab, kind: TabHTML }
                         tIcon = Tab { name: "Icon", template: PermanentTab, kind: TabIcon }
                         tIconSet = Tab { name: "IconSet", template: PermanentTab, kind: TabIconSet }
@@ -178,15 +145,13 @@
                         
                         TabOverview = <UIZooTab> { <WidgetsOverview> {} }
                         TabLayoutDemos = <UIZooTab> { <DemoLayout> {} }
-                        TabAdaptiveView = <UIZooTab> { <DemoAdaptiveView> {} }
                         TabButton = <UIZooTab> { <DemoButton> {} }
                         TabCheckBox = <UIZooTab> { <DemoCheckBox> {} }
-                        TabCommandTextInput = <UIZooTab> { <DemoCommandTextInput> {} }
-                        TabDesktopButton = <UIZooTab> { <DemoDesktopButton> {} }
+                        // TabCommandTextInput = <UIZooTab> { <DemoCommandTextInput> {} }
+                        // TabDesktopButton = <UIZooTab> { <DemoDesktopButton> {} }
                         TabDropDown = <UIZooTab> { <DemoDropdown> {} }
                         TabFiletree = <UIZooTab> { <DemoFT> {} }
-                        TabFoldButton = <UIZooTab> { <DemoFoldButton> {} }
-                        TabFoldHeader = <UIZooTab> { <DemoFoldHeader> {} }
+                        // TabFoldButton = <UIZooTab> { <DemoFoldButton> {} }
                         TabHTML = <UIZooTab> { <DemoHtml> {} }
                         TabIcon = <UIZooTab> { <DemoIcon> {} }
                         TabIconSet = <UIZooTab> { <DemoIconSet> {} }
@@ -209,6 +174,65 @@
 
 
                     }
+
+                    <View> {
+                        width: Fill, height: Fit,
+                        flow: Right,
+                        spacing: (THEME_SPACE_2)
+                        align: { x: 0.0, y: 0.0 }
+                        padding: <THEME_MSPACE_2> {}
+                        margin: { bottom: (THEME_SPACE_1) }
+
+                        show_bg: true,
+
+                        draw_bg: {
+                            uniform color_dither: 1.0
+                            uniform border_radius: 0.
+                            uniform border_size: (THEME_BEVELING)
+                            uniform color_1: (THEME_COLOR_BG_APP * 0.9);
+                            uniform color_2: #282828;
+
+                            fn pixel(self) -> vec4 {
+                                let sdf = Sdf2d::viewport(self.pos * self.rect_size)
+                                let dither = Math::random_2d(self.pos.xy) * 0.04 * self.color_dither;
+
+                                sdf.rect(
+                                    -2.,
+                                    1.,
+                                    self.rect_size.x + 2.,
+                                    self.rect_size.y + 30.
+                                )
+
+                                sdf.fill_keep((THEME_COLOR_U_1));
+
+                                sdf.stroke(
+                                    mix((THEME_COLOR_BEVEL_OUTSET_1), #fff0, pow(self.pos.y, 0.1)), self.border_size
+                                )
+                                return sdf.result
+                            }
+                        }
+
+                        <Slider> { text: "Contrast" }
+                        <View> {
+                            flow: Down
+                            spacing: 0.
+                            <Label> { margin: {top: (THEME_SPACE_1)}, padding: 0., width: Fit, text: "Tint Color"}
+                            <TextInput> { empty_text: "Hex color", text: "#f00" }
+                        }
+                        <Slider> { text: "Tint Amount" }
+                        <Vr> {}
+                        <Pbold> {
+                            width: Fit,
+                            text: "Font"
+                        }
+                        <Slider> { text: "Size" }
+                        <Slider> { text: "Size Contrast" }
+                        <Vr> {}
+                        <Slider> { text: "Bevel" }
+                        <Slider> { text: "Rounding" }
+                        <Slider> { text: "Space" }
+                    }
+
 
                 }
             }
@@ -233,12 +257,16 @@
         #[live] fnumber: f32,
         #[live] inumber: i32,
         #[live] dropdown: DropDownEnum,
+        #[live] dropdown_customized: DropDownEnum,
         #[live] dropdown_below: DropDownEnum,
         #[live] dropdown_flat: DropDownEnum,
+        #[live] dropdown_flat_below: DropDownEnum,
         #[live] dropdown_flatter: DropDownEnum,
+        #[live] dropdown_flatter_below: DropDownEnum,
         #[live] dropdown_gradient_x: DropDownEnum,
+        #[live] dropdown_gradient_x_below: DropDownEnum,
         #[live] dropdown_gradient_y: DropDownEnum,
-        #[live] dropdown_custom: DropDownEnum,
+        #[live] dropdown_gradient_y_below: DropDownEnum,
     }
     #[derive(Live, LiveHook)]
     pub struct App {
@@ -247,21 +275,21 @@
         #[rust(DataBindingsForApp::new(cx))] bindings: DataBindingsForApp
     }
 
-    impl LiveRegister for App {
-        fn live_register(cx: &mut Cx) {
+impl LiveRegister for App {
+        fn live_register(cx: &mut Cx) { 
             crate::makepad_widgets::live_design(cx);
+            cx.link(live_id!(theme), live_id!(theme_desktop_dark));
+
             crate::layout_templates::live_design(cx);
             crate::demofiletree::live_design(cx);
 
-            crate::tab_adaptiveview::live_design(cx);
             crate::tab_button::live_design(cx);
             crate::tab_checkbox::live_design(cx);
-            crate::tab_commandtextinput::live_design(cx);
-            crate::tab_desktopbutton::live_design(cx);
+            // crate::tab_commandtextinput::live_design(cx);
+            // crate::tab_desktopbutton::live_design(cx);
             crate::tab_dropdown::live_design(cx);
             crate::tab_filetree::live_design(cx);
-            crate::tab_foldbutton::live_design(cx);
-            crate::tab_foldheader::live_design(cx);
+            // crate::tab_foldbutton::live_design(cx);
             crate::tab_html::live_design(cx);
             crate::tab_icon::live_design(cx);
             crate::tab_iconset::live_design(cx);
@@ -289,23 +317,27 @@
     impl MatchEvent for App{
         fn handle_actions(&mut self, cx: &mut Cx, actions:&Actions) {
             let ui = self.ui.clone();
-            let tui = ui.dock(id!(dock)).item(live_id!(tRadioButton));
-            tui.radio_button_set(ids!(radios_demo_1.radio1, radios_demo_1.radio2, radios_demo_1.radio3, radios_demo_1.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_2.radio1, radios_demo_2.radio2, radios_demo_2.radio3, radios_demo_2.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_3.radio1, radios_demo_3.radio2, radios_demo_3.radio3, radios_demo_3.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_4.radio1, radios_demo_4.radio2, radios_demo_4.radio3, radios_demo_4.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_5.radio1, radios_demo_5.radio2, radios_demo_5.radio3, radios_demo_5.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_6.radio1, radios_demo_6.radio2, radios_demo_6.radio3, radios_demo_6.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_7.radio1, radios_demo_7.radio2, radios_demo_7.radio3, radios_demo_7.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_8.radio1, radios_demo_8.radio2, radios_demo_8.radio3, radios_demo_8.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_9.radio1, radios_demo_9.radio2, radios_demo_9.radio3, radios_demo_9.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_10.radio1, radios_demo_10.radio2, radios_demo_10.radio3, radios_demo_10.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_11.radio1, radios_demo_11.radio2, radios_demo_11.radio3, radios_demo_11.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_12.radio1, radios_demo_12.radio2, radios_demo_12.radio3, radios_demo_12.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_13.radio1, radios_demo_13.radio2, radios_demo_13.radio3, radios_demo_13.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_14.radio1, radios_demo_14.radio2, radios_demo_14.radio3, radios_demo_14.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_15.radio1, radios_demo_15.radio2, radios_demo_15.radio3, radios_demo_15.radio4)).selected(cx, actions);
-            tui.radio_button_set(ids!(radios_demo_16.radio1, radios_demo_16.radio2, radios_demo_16.radio3, radios_demo_16.radio4)).selected(cx, actions);
+
+            ui.radio_button_set(ids!(radios_demo_1.radio1, radios_demo_1.radio2, radios_demo_1.radio3, radios_demo_1.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_2.radio1, radios_demo_2.radio2, radios_demo_2.radio3, radios_demo_2.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_3.radio1, radios_demo_3.radio2, radios_demo_3.radio3, radios_demo_3.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_4.radio1, radios_demo_4.radio2, radios_demo_4.radio3, radios_demo_4.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_5.radio1, radios_demo_5.radio2, radios_demo_5.radio3, radios_demo_5.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_6.radio1, radios_demo_6.radio2, radios_demo_6.radio3, radios_demo_6.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_7.radio1, radios_demo_7.radio2, radios_demo_7.radio3, radios_demo_7.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_8.radio1, radios_demo_8.radio2)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_9.radio1, radios_demo_9.radio2, radios_demo_9.radio3, radios_demo_9.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_10.radio1, radios_demo_10.radio2, radios_demo_10.radio3, radios_demo_10.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_11.radio1, radios_demo_11.radio2, radios_demo_11.radio3, radios_demo_11.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_12.radio1, radios_demo_12.radio2, radios_demo_12.radio3, radios_demo_12.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_13.radio1, radios_demo_13.radio2, radios_demo_13.radio3, radios_demo_13.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_14.radio1, radios_demo_14.radio2, radios_demo_14.radio3, radios_demo_14.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_15.radio1, radios_demo_15.radio2, radios_demo_15.radio3, radios_demo_15.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_16.radio1, radios_demo_16.radio2, radios_demo_16.radio3, radios_demo_16.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_17.radio1, radios_demo_17.radio2, radios_demo_17.radio3, radios_demo_17.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_18.radio1, radios_demo_18.radio2, radios_demo_18.radio3, radios_demo_18.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_19.radio1, radios_demo_19.radio2, radios_demo_19.radio3, radios_demo_19.radio4)).selected(cx, actions);
+            ui.radio_button_set(ids!(radios_demo_20.radio1, radios_demo_20.radio2, radios_demo_20.radio3, radios_demo_20.radio4)).selected(cx, actions);
 
             if let Some(txt) = self.ui.text_input(id!(simpletextinput)).changed(&actions){
                 log!("TEXTBOX CHANGED {}", self.counter);
@@ -344,6 +376,10 @@
                 btn.set_text(cx,&format!("Styled button clicked: {}", self.counter));
             }
 
+            if self.ui.button(id!(find)).clicked(&actions) {
+                
+            }
+
             if self.ui.button(id!(iconbutton)).clicked(&actions) {
                 log!("ICON BUTTON CLICKED {}", self.counter);
                 self.counter += 1;
@@ -359,22 +395,6 @@
                 lbl.set_text(cx,&format!("{} {}" , self.counter, check));
             }
 
-            if self.ui.fold_button(id!(folderbutton)).opening(actions) {
-                log!("FOLDER BUTTON CLICKED {} {}", self.counter, 12);
-    //            self.ui.fold_header(id!(thefoldheader)).opened = true;
-
-                self.counter += 1;
-            }
-
-            if self.ui.fold_button(id!(folderbutton)).closing(actions) {
-                log!("FOLDER BUTTON CLICKED {} {}", self.counter, 12);
-
-
-
-                self.counter += 1;
-            }
-
-
         let mut db = DataBindingStore::new();
         db.data_bind(cx, actions, &self.ui, Self::data_bind);
         self.bindings.apply_over(cx, &db.nodes);
@@ -382,7 +402,6 @@
     }
 
     fn handle_startup(&mut self, cx: &mut Cx) {
-
         let ui = self.ui.clone();
         let db = DataBindingStore::from_nodes(self.bindings.live_read());
         Self::data_bind(db.data_to_widgets(cx, &ui));
@@ -399,6 +418,8 @@ impl AppMain for App {
 impl App{
     pub fn data_bind(mut db: DataBindingMap) {
         db.bind(id!(dropdown), ids!(dropdown));
+        db.bind(id!(dropdown_disabled), ids!(dropdown_disabled));
+        db.bind(id!(dropdown_demo), ids!(dropdown_demo));
         db.bind(id!(dropdown_flat), ids!(dropdown_flat));
         db.bind(id!(dropdown_flatter), ids!(dropdown_flatter));
         db.bind(id!(dropdown_gradient_x), ids!(dropdown_gradient_x));

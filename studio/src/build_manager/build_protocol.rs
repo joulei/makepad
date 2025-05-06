@@ -121,6 +121,7 @@ impl BuildTarget {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, SerRon, DeRon)]
 pub struct BuildProcess {
+    pub root: String,
     pub binary: String,
     pub target: BuildTarget,
 }
@@ -166,7 +167,7 @@ pub struct LogItemBare {
     pub line: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LogItem {
     Bare(LogItemBare),
     Location(LogItemLocation),

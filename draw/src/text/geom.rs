@@ -212,14 +212,27 @@ impl<T> Rect<T> {
         true
     }
 
+    pub fn contains_point_inclusive(self, point: Point<T>) -> bool
+    where
+        T: Add<Output = T> + Copy + Ord,
+    {
+        if !(self.min().x..=self.max().x).contains(&point.x) {
+            return false;
+        }
+        if !(self.min().y..=self.max().y).contains(&point.y) {
+            return false;
+        }
+        true
+    }
+
     pub fn contains_rect(self, other: Self) -> bool
     where
         T: Add<Output = T> + Copy + Ord,
     {
-        if !self.contains_point(other.min()) && self.min() != other.min() {
+        if !self.contains_point(other.min()) {
             return false;
         }
-        if !self.contains_point(other.max()) && self.max() != other.max() {
+        if !self.contains_point_inclusive(other.max()) {
             return false;
         }
         true
@@ -251,6 +264,20 @@ impl<T> Rect<T> {
         T: Add<Output = T> + Copy + Sub<Output = T>,
     {
         Self::new(self.origin - padding, self.size + padding + padding)
+    }
+
+    pub fn unpad(self, padding: impl Into<Size<T>>) -> Self
+    where
+        T: Add<Output = T> + Copy + Sub<Output = T>,
+    {
+        self._unpad(padding.into())
+    }
+
+    fn _unpad(self, padding: Size<T>) -> Self
+    where
+        T: Add<Output = T> + Copy + Sub<Output = T>,
+    {
+        Self::new(self.origin + padding, self.size - padding - padding)
     }
 
     pub fn apply_transform(self, t: Transform<T>) -> Self

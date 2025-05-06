@@ -104,7 +104,7 @@ live_design!{
 
         draw_bg: {
             border_size: 0.0
-            border_color: (THEME_COLOR_BEVEL_LIGHT)
+            border_color: (THEME_COLOR_BEVEL_OUTSET_1)
             shadow_color: (THEME_COLOR_D_4)
             shadow_radius: 7.5
             shadow_offset: vec2(0.0, 0.0)
@@ -244,13 +244,6 @@ impl<'a> Iterator for DockVisibleItemIterator<'a> {
         None
     }
 }
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
-pub struct DockItemId {
-    pub kind: LiveId,
-    pub id: LiveId
-}
-
 
 struct TabBarWrap {
     tab_bar: TabBar,
@@ -401,6 +394,16 @@ impl LiveHook for Dock {
 }
 
 impl Dock {
+    pub fn unique_id(&self, base:u64)->LiveId{
+        let mut id = LiveId(base);
+        let mut i = 0u32;
+        while self.dock_items.get(&id).is_some(){
+            id = id.bytes_append(&i.to_be_bytes());
+            i += 1;
+        }
+        return id;
+    }
+    
     fn create_all_items(&mut self, cx: &mut Cx) {
         // make sure our items exist
         let mut items = Vec::new();
@@ -732,8 +735,13 @@ impl Dock {
                         }
                         self.close_tab(cx, item, true);
                     }
-                    let new_split = LiveId::unique();
-                    let new_tabs = LiveId::unique();
+                    let new_tabs = self.unique_id(self.dock_items.len() as u64);
+                    self.dock_items.insert(new_tabs, DockItem::Tabs {
+                        tabs: vec![item],
+                        closable: true,
+                        selected: 0,
+                    });
+                    let new_split = self.unique_id(self.dock_items.len() as u64);
                     self.set_parent_split(pos.id, new_split);
                     self.dock_items.insert(new_split, match pos.part {
                         DropPart::Left => DockItem::Splitter {
@@ -762,11 +770,7 @@ impl Dock {
                         },
                         _ => panic!()
                     });
-                    self.dock_items.insert(new_tabs, DockItem::Tabs {
-                        tabs: vec![item],
-                        closable: true,
-                        selected: 0,
-                    });
+                    
                     return true
                 }
                 DropPart::Center => {
@@ -1238,15 +1242,9 @@ impl DockRef {
         }
     }
 
-    pub fn unique_tab_id(&self, base:u64)->LiveId{
+    pub fn unique_id(&self, base:u64)->LiveId{
         if let Some(dock) = self.borrow() {
-            let mut id = LiveId(base);
-            let mut i = 0u32;
-            while dock.dock_items.get(&id).is_some(){
-                id = id.bytes_append(&i.to_be_bytes());
-                i += 1;
-            }
-            return id;
+            return dock.unique_id(base);
         }
         LiveId(0)
     }

@@ -2,7 +2,6 @@ use {
     crate::{
         cx_2d::Cx2d,
         cx_draw::CxDraw,
-        draw_list_2d::ManyInstances,
         geometry::GeometryQuad2D,
         makepad_platform::*,
         text::{
@@ -298,15 +297,19 @@ impl DrawText {
 
     pub fn layout(
         &self,
-        cx: &mut Cx2d,
+        cx: &mut Cx,
         first_row_indent_in_lpxs: f32,
         first_row_min_line_spacing_below_in_lpxs: f32,
         wrap_width_in_lpxs: Option<f32>,
         align: Align,
         text: &str,
     ) -> Rc<LaidoutText> {
+        CxDraw::lazy_construct_fonts(cx);
+        let fonts = cx.get_global::<Rc<RefCell<Fonts>>>().clone();
+        let mut fonts = fonts.borrow_mut();
+
         let text_len = text.len();
-        cx.fonts.borrow_mut().get_or_layout(BorrowedLayoutParams {
+        fonts.get_or_layout(BorrowedLayoutParams {
             text,
             spans: &[Span {
                 style: Style {
@@ -327,11 +330,10 @@ impl DrawText {
     }
 
     fn draw_text(&mut self, cx: &mut Cx2d, origin_in_lpxs: Point<f32>, text: &LaidoutText) {
-        use crate::text::geom::Size;
-
         self.update_draw_vars(cx);
-        let mut instances: ManyInstances =
-            cx.begin_many_aligned_instances(&self.draw_vars).unwrap();
+        let Some(mut instances) = cx.begin_many_aligned_instances(&self.draw_vars) else {
+            return;
+        };
         self.glyph_depth = self.draw_depth;
         for row in &text.rows {
             self.draw_row(
@@ -348,13 +350,13 @@ impl DrawText {
     fn update_draw_vars(&mut self, cx: &mut Cx2d) {
         let fonts = cx.fonts.borrow();
         let rasterizer = fonts.rasterizer().borrow();
-        let sdfer_settings = rasterizer.sdfer_settings();
+        let sdfer_settings = rasterizer.sdfer().settings();
         self.draw_vars.user_uniforms[0] = sdfer_settings.radius;
         self.draw_vars.user_uniforms[1] = sdfer_settings.cutoff;
-        let grayscale_atlas_size = rasterizer.grayscale_atlas_size();
+        let grayscale_atlas_size = rasterizer.grayscale_atlas().size();
         self.draw_vars.user_uniforms[2] = grayscale_atlas_size.width as f32;
         self.draw_vars.user_uniforms[3] = grayscale_atlas_size.height as f32;
-        let color_atlas_size = rasterizer.color_atlas_size();
+        let color_atlas_size = rasterizer.color_atlas().size();
         self.draw_vars.user_uniforms[4] = color_atlas_size.width as f32;
         self.draw_vars.user_uniforms[5] = color_atlas_size.height as f32;
         self.draw_vars.texture_slots[0] = Some(fonts.grayscale_texture().clone());
@@ -368,8 +370,6 @@ impl DrawText {
         row: &LaidoutRow,
         out_instances: &mut Vec<f32>,
     ) {
-        use crate::text::geom::Size;
-
         for glyph in &row.glyphs {
             self.draw_glyph(
                 cx,
@@ -448,7 +448,7 @@ impl DrawText {
 
     fn draw_rasterized_glyph(
         &mut self,
-        origin_in_lpxs: crate::text::geom::Point<f32>,
+        origin_in_lpxs: Point<f32>,
         font_size_in_lpxs: f32,
         color: Option<Color>,
         glyph: RasterizedGlyph,
@@ -524,7 +524,7 @@ pub struct FontFamily {
 
 impl FontFamily {
     fn to_font_family_id(&self) -> FontFamilyId {
-        (self.id.0 as usize).into()
+        (self.id.0).into()
     }
 }
 
@@ -556,7 +556,7 @@ impl LiveHook for FontFamily {
             let mut next_child_index = Some(index + 1);
             while let Some(child_index) = next_child_index {
                 if let LiveValue::Font(font) = &nodes[child_index].value {
-                    let font_id: FontId = (font.to_live_id().0 as usize).into();
+                    let font_id: FontId = (font.to_live_id().0).into();
                     if !fonts.is_font_known(font_id) {
                         fonts.define_font(
                             font_id,

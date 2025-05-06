@@ -10,13 +10,13 @@ live_design!{
 
     pub DemoPageFlip = <UIZooTabLayout_B> {
         desc = {
-            <H3> { text: "<PageFlip>"}
+            <Markdown> { body: dep("crate://self/resources/pageflip.md") } 
         }
         demos = {
             <View> {
                 height: Fit, width: Fill,
                 flow: Right,
-                spacing: 10.
+                spacing: (THEME_SPACE_2)
                 pageflipbutton_a = <Button> { text: "Page A" }
                 pageflipbutton_b = <Button> { text: "Page B" }
                 pageflipbutton_c = <Button> { text: "Page C" }

@@ -4,6 +4,9 @@ pub use makepad_html;
 pub use makepad_derive_widget;
 pub use makepad_draw::*;
 pub use makepad_derive_widget::*;
+pub use makepad_platform::log;
+pub use makepad_zune_jpeg;
+pub use makepad_zune_png;
 
 pub mod button;
 pub mod cached_widget;
@@ -44,6 +47,7 @@ pub mod multi_image;
 pub mod modal;
 pub mod tooltip;
 pub mod popup_notification;
+pub mod loading_spinner;
 pub mod web_view;
 
 // Only available on Android at the moment
@@ -174,7 +178,7 @@ pub fn live_design(cx: &mut Cx) {
     else{
         cx.link(live_id!(designer), live_id!(designer_dummy));
     }
-    
+
     makepad_draw::live_design(cx);
     crate::page_flip::live_design(cx);
     crate::debug_view::live_design(cx);
@@ -239,6 +243,7 @@ pub fn live_design(cx: &mut Cx) {
     crate::toggle_panel::live_design(cx);
     crate::cached_widget::live_design(cx);
     crate::command_text_input::live_design(cx);
+    crate::loading_spinner::live_design(cx);
     crate::web_view::live_design(cx);
     crate::xr_hands::live_design(cx);
         
