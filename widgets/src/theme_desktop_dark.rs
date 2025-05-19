@@ -6,12 +6,12 @@ live_design! {
     
     // GLOBAL PARAMETERS
     pub THEME_COLOR_CONTRAST = 1.0
-    pub THEME_COLOR_TINT = #444488
+    pub THEME_COLOR_TINT = #0000ff
     pub THEME_COLOR_TINT_AMOUNT = 0.0
     pub THEME_SPACE_FACTOR = 6. // Increase for a less dense layout
     pub THEME_CORNER_RADIUS = 2.5
     pub THEME_BEVELING = 0.75
-    pub THEME_FONT_SIZE_BASE = 7.5
+    pub THEME_FONT_SIZE_BASE = 10.
     pub THEME_FONT_SIZE_CONTRAST = 2.5// Greater values = greater font-size steps between font-formats (i.e. from H3 to H2)
 
     // DIMENSIONS
@@ -74,15 +74,14 @@ live_design! {
     pub THEME_COLOR_BLACK = (mix(THEME_COLOR_B, THEME_COLOR_B_H, pow(0.1, THEME_COLOR_CONTRAST)))
 
     pub THEME_COLOR_BG_APP = (mix(
-        mix(THEME_COLOR_B, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT),
-        mix(THEME_COLOR_W, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT),
+        (THEME_COLOR_B * mix(#ffffff, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT)),
+        (THEME_COLOR_W * mix(#ffffff, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT)),
         pow(0.3, THEME_COLOR_CONTRAST)))
     pub THEME_COLOR_FG_APP = (mix(
-        mix(THEME_COLOR_B, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT),
-        mix(THEME_COLOR_W, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT),
+        (THEME_COLOR_B * mix(#ffffff, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT)),
+        (THEME_COLOR_W * mix(#ffffff, THEME_COLOR_TINT, THEME_COLOR_TINT_AMOUNT)),
         pow(0.36, THEME_COLOR_CONTRAST))
     )
-
     pub THEME_COLOR_OPAQUE_U_6 = (mix(THEME_COLOR_FG_APP, #F, 0.8))
     pub THEME_COLOR_OPAQUE_U_5 = (mix(THEME_COLOR_FG_APP, #F, 0.7))
     pub THEME_COLOR_OPAQUE_U_4 = (mix(THEME_COLOR_FG_APP, #F, 0.5))
@@ -337,47 +336,67 @@ live_design! {
     pub THEME_FONT_HL_LINE_SPACING = 1.05
     pub THEME_FONT_LONGFORM_LINE_SPACING = 1.2
 
-    pub THEME_FONT_SIZE_1 = (THEME_FONT_SIZE_BASE + 16 * THEME_FONT_SIZE_CONTRAST)
-    pub THEME_FONT_SIZE_2 = (THEME_FONT_SIZE_BASE + 8 * THEME_FONT_SIZE_CONTRAST)
-    pub THEME_FONT_SIZE_3 = (THEME_FONT_SIZE_BASE + 4 * THEME_FONT_SIZE_CONTRAST)
-    pub THEME_FONT_SIZE_4 = (THEME_FONT_SIZE_BASE + 2 * THEME_FONT_SIZE_CONTRAST)
-    pub THEME_FONT_SIZE_P = (THEME_FONT_SIZE_BASE + 1 * THEME_FONT_SIZE_CONTRAST)
+    pub THEME_FONT_SIZE_1 = (THEME_FONT_SIZE_BASE + 8 * THEME_FONT_SIZE_CONTRAST)
+    pub THEME_FONT_SIZE_2 = (THEME_FONT_SIZE_BASE + 4 * THEME_FONT_SIZE_CONTRAST)
+    pub THEME_FONT_SIZE_3 = (THEME_FONT_SIZE_BASE + 2 * THEME_FONT_SIZE_CONTRAST)
+    pub THEME_FONT_SIZE_4 = (THEME_FONT_SIZE_BASE + 1 * THEME_FONT_SIZE_CONTRAST)
+    pub THEME_FONT_SIZE_P = (THEME_FONT_SIZE_BASE)
 
     pub THEME_FONT_LABEL = {
         font_family:{
             latin = font("crate://self/resources/IBMPlexSans-Text.ttf", -0.1, 0.0),
-            chinese = font("crate://self/resources/LXGWWenKaiRegular.ttf", 0.0, 0.0)
-            emoji = font("crate://self/resources/NotoColorEmoji.ttf", 0.0, 0.0)
+            chinese = font(
+                "crate://makepad_fonts_chinese_regular/resources/LXGWWenKaiRegular.ttf",
+                "crate://makepad_fonts_chinese_regular_2/resources/LXGWWenKaiRegular.ttf.2",
+                0.0, 
+                0.0)
+            emoji = font("crate://makepad_fonts_emoji/resources/NotoColorEmoji.ttf", 0.0, 0.0)
         },
         line_spacing: 1.2
     } // TODO: LEGACY, REMOVE. REQUIRED BY RUN LIST IN STUDIO ATM
     pub THEME_FONT_REGULAR = {
         font_family: {
             latin = font("crate://self/resources/IBMPlexSans-Text.ttf", -0.1, 0.0),
-            chinese = font("crate://self/resources/LXGWWenKaiRegular.ttf", 0.0, 0.0)
-            emoji = font("crate://self/resources/NotoColorEmoji.ttf", 0.0, 0.0)
+            chinese = font(
+                "crate://makepad_fonts_chinese_regular/resources/LXGWWenKaiRegular.ttf",
+                "crate://makepad_fonts_chinese_regular_2/resources/LXGWWenKaiRegular.ttf.2",
+                0.0, 
+                0.0)
+            emoji = font("crate://makepad_fonts_emoji/resources/NotoColorEmoji.ttf", 0.0, 0.0)
         },
         line_spacing: 1.2
     }
     pub THEME_FONT_BOLD = {
         font_family:{
             latin = font("crate://self/resources/IBMPlexSans-SemiBold.ttf", -0.1, 0.0),
-            chinese = font("crate://self/resources/LXGWWenKaiBold.ttf", 0.0, 0.0),
-            emoji = font("crate://self/resources/NotoColorEmoji.ttf", 0.0, 0.0)
+            chinese = font(
+                "crate://makepad_fonts_chinese_bold/resources/LXGWWenKaiBold.ttf",
+                "crate://makepad_fonts_chinese_bold_2/resources/LXGWWenKaiBold.ttf.2",
+                0.0, 
+                0.0)
+            emoji = font("crate://makepad_fonts_emoji/resources/NotoColorEmoji.ttf", 0.0, 0.0)
         },
         line_spacing: 1.2
     }
     pub THEME_FONT_ITALIC = {
         font_family:{
             latin = font("crate://self/resources/IBMPlexSans-Italic.ttf", -0.1, 0.0),
-            chinese =  font("crate://self/resources/LXGWWenKaiRegular.ttf", 0.0, 0.0),
+            chinese = font(
+                "crate://makepad_fonts_chinese_regular/resources/LXGWWenKaiRegular.ttf",
+                "crate://makepad_fonts_chinese_regular_2/resources/LXGWWenKaiRegular.ttf.2",
+                0.0, 
+                0.0)
         },
         line_spacing: 1.2
     }
     pub THEME_FONT_BOLD_ITALIC = {
         font_family:{
             latin = font("crate://self/resources/IBMPlexSans-BoldItalic.ttf", -0.1, 0.0),
-            chinese = font("crate://self/resources/LXGWWenKaiBold.ttf", 0.0, 0.0),
+            chinese = font(
+                "crate://makepad_fonts_chinese_bold/resources/LXGWWenKaiBold.ttf",
+                "crate://makepad_fonts_chinese_bold_2/resources/LXGWWenKaiBold.ttf.2",
+                0.0, 
+                0.0)
         },
         line_spacing: 1.2
     }

@@ -183,7 +183,7 @@ live_design!{
             <Hr> {}
             <H4> { text: "ButtonFlatterIcon"}
             <UIZooRowH> {
-                <ButtonFlatIcon> {
+                <ButtonFlatterIcon> {
                     draw_icon: {
                         color: #f00,
                         svg_file: dep("crate://self/resources/Icon_Favorite.svg"),
@@ -207,11 +207,6 @@ live_design!{
 
                         text_style: {
                             font_size: (THEME_FONT_SIZE_P)
-                            font_family: {
-                                latin = font("crate://makepad_widgets/resources/IBMPlexSans-Text.ttf", -0.1, 0.0),
-                                chinese = font("crate://makepad_widgets/resources/LXGWWenKaiRegular.ttf", 0.0, 0.0)
-                                emoji = font("crate://makepad_widgets/resources/NotoColorEmoji.ttf", 0.0, 0.0)
-                            },
                             line_spacing: 1.2
                         }
                     }
