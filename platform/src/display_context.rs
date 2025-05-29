@@ -14,4 +14,9 @@ impl DisplayContext {
     pub fn is_desktop(&self) -> bool {
         self.screen_size.x >= DEFAULT_MIN_DESKTOP_WIDTH
     }
+
+
+    pub fn is_screen_size_known(&self) -> bool {
+        self.screen_size.x != 0.0 && self.screen_size.y != 0.0
+    }
 }

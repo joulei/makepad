@@ -314,9 +314,10 @@ impl AdaptiveView {
     }
 
     pub fn set_default_variant_selector(&mut self) {
-        // TODO(Julian): setup a more comprehensive default
+        // TODO(Julian): setup a more comprehensive default, currently defaults to Desktop even if the screen size is unknown
+        // (happens on startup for macOS due to a regression, first few WindowGeomChange events report size 0)
         self.set_variant_selector(|cx, _parent_size| {
-            if cx.display_context.is_desktop() {
+            if cx.display_context.is_desktop() || !cx.display_context.is_screen_size_known() {
                 live_id!(Desktop)
             } else {
                 live_id!(Mobile)
