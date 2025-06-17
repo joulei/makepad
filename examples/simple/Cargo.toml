@@ -9,3 +9,6 @@ metadata.makepad-auto-version = "EVyKRfOGV339Re5CS45PMHHxw_M="
 
 [dependencies]
 makepad-widgets = { path = "../../widgets", version = "1.0.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.22"

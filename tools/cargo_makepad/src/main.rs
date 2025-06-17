@@ -103,7 +103,7 @@ fn show_help(err: &str){
 
 fn main() {
     let args:Vec<String> = std::env::args().collect();
-
+    println!("args: {:?}", args);
     // Skip the first argument if it's the binary path or 'cargo'
     let args = if args.len() > 1 && (args[0].ends_with("cargo-makepad") || args[0] == "cargo" || args[0].ends_with("cargo-makepad.exe")) {
         // If it's 'cargo makepad', then skip the second argument as well
