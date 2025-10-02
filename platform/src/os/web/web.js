@@ -298,6 +298,110 @@ export class WasmWebBrowser extends WasmBridge {
         this.audio_context.close();
         this.audio_context = null;
     }
+
+    FromWasmStartAudioInput(args) {
+        console.log("FromWasmStartAudioInput", args);
+        if (this.audio_input_stream) {
+            this.FromWasmStopAudioInput();
+        }
+
+        const start_input = async () => {
+            try {
+                // Request microphone access
+                const constraints = {
+                    audio: true
+                };
+
+                // If a specific device is requested, add deviceId constraint
+                if (args.web_device_id && args.web_device_id !== '') {
+                    constraints.audio = {
+                        deviceId: { exact: args.web_device_id }
+                    };
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                this.audio_input_stream = stream;
+
+                // Create audio context if it doesn't exist
+                if (!this.audio_input_context) {
+                    this.audio_input_context = new AudioContext({
+                        latencyHint: "interactive",
+                        sampleRate: 48000
+                    });
+                }
+
+                // Create media stream source
+                const source = this.audio_input_context.createMediaStreamSource(stream);
+
+                // Create script processor for audio capture
+                // Note: ScriptProcessorNode is deprecated but still widely supported
+                // For modern browsers, we'd want to use AudioWorklet, but this is simpler
+                const scriptProcessor = this.audio_input_context.createScriptProcessor(1024, 1, 1);
+
+                scriptProcessor.onaudioprocess = (event) => {
+                    const inputBuffer = event.inputBuffer;
+                    const channelData = inputBuffer.getChannelData(0);
+                    const frameCount = channelData.length;
+                    const channels = 1; // Mono for now
+
+                    // Allocate memory in WASM for audio data
+                    const dataSize = frameCount * channels * 4; // 4 bytes per float32
+                    const dataPtr = this.wasm._malloc(dataSize);
+
+                    // Copy audio data to WASM memory
+                    const wasmArray = new Float32Array(this.wasm._memory.buffer, dataPtr, frameCount * channels);
+                    wasmArray.set(channelData);
+
+                    // Call WASM audio input entrypoint
+                    this.exports.wasm_audio_input_entrypoint(
+                        args.context_ptr,
+                        frameCount,
+                        channels,
+                        dataPtr
+                    );
+
+                    // Free the allocated memory
+                    this.wasm._free(dataPtr);
+                };
+
+                // Connect the audio graph
+                source.connect(scriptProcessor);
+                scriptProcessor.connect(this.audio_input_context.destination);
+
+                this.audio_input_source = source;
+                this.audio_input_processor = scriptProcessor;
+
+            } catch (error) {
+                console.error('Error starting audio input:', error);
+                // Clean up on error
+                this.FromWasmStopAudioInput();
+            }
+        };
+
+        start_input();
+    }
+
+    FromWasmStopAudioInput(args) {
+        if (this.audio_input_processor) {
+            this.audio_input_processor.disconnect();
+            this.audio_input_processor = null;
+        }
+
+        if (this.audio_input_source) {
+            this.audio_input_source.disconnect();
+            this.audio_input_source = null;
+        }
+
+        if (this.audio_input_stream) {
+            this.audio_input_stream.getTracks().forEach(track => track.stop());
+            this.audio_input_stream = null;
+        }
+
+        if (this.audio_input_context) {
+            this.audio_input_context.close();
+            this.audio_input_context = null;
+        }
+    }
     
     FromWasmStartAudioOutput(args) {
         if (this.audio_context) {

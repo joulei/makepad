@@ -3,7 +3,7 @@ use {
     self::super::{
         web::CxOs,
         to_wasm::ToWasmAudioDeviceList,
-        from_wasm::{FromWasmQueryAudioDevices, FromWasmStartAudioOutput, FromWasmStopAudioOutput}
+        from_wasm::{FromWasmQueryAudioDevices, FromWasmStartAudioOutput, FromWasmStopAudioOutput, FromWasmStartAudioInput, FromWasmStopAudioInput}
     },
     crate::{
         makepad_live_id::*,
@@ -19,6 +19,13 @@ pub struct WebAudioOutputClosure {
     pub output_buffer: AudioBuffer,
 }
 
+#[repr(C)]
+pub struct WebAudioInputClosure {
+    pub callback: Box<dyn FnMut(AudioInfo, &AudioBuffer) + Send + 'static>,
+    pub device_id: AudioDeviceId,
+    pub input_buffer: AudioBuffer,
+}
+
 pub struct WebAudioDevice {
     web_device_id: String,
     desc: AudioDeviceDesc
@@ -32,6 +39,8 @@ pub struct WebAudioAccess {
     self_arc: *const Mutex<WebAudioAccess>,
     output_device_id: AudioDeviceId,
     output_buffer: Option<AudioBuffer>,
+    input_device_id: AudioDeviceId,
+    input_buffer: Option<AudioBuffer>,
 }
 
 impl WebAudioAccess {
@@ -45,7 +54,9 @@ impl WebAudioAccess {
             change_signal,
             self_arc: std::ptr::null(),
             output_buffer: Some(Default::default()),
-            output_device_id: Default::default()
+            output_device_id: Default::default(),
+            input_buffer: Some(Default::default()),
+            input_device_id: Default::default()
         }));
         let self_arc = ret.clone();
         ret.lock().unwrap().self_arc = Arc::into_raw(self_arc);
@@ -85,9 +96,28 @@ impl WebAudioAccess {
         self.change_signal.set();
     }
     
-    pub fn use_audio_inputs(&mut self, _os: &mut CxOs, _devices: &[AudioDeviceId]) {
-        // TODO
-        crate::log!("Web audio input todo!");
+    pub fn use_audio_inputs(&mut self, os: &mut CxOs, devices: &[AudioDeviceId]) {
+        // alright we're going to use audio inputs.
+        // we can however only use one so we'll use the first one
+        // and then we'll send over the device we want to the other side
+        if devices.len() == 0 {
+            os.from_wasm(FromWasmStopAudioInput {});
+            return
+        }
+        if devices.len()>1 {
+            crate::log!("Web only supports a single audio input device");
+        }
+        let web_device_id = if let Some(device) = self.devices.iter().find( | v | v.desc.device_id == devices[0]) {
+            device.web_device_id.clone()
+        }
+        else {
+            "".to_string()
+        };
+        self.input_device_id = devices[0];
+        os.from_wasm(FromWasmStartAudioInput {
+            web_device_id,
+            context_ptr: self.self_arc as u32
+        });
     }
     
     pub fn use_audio_outputs(&mut self, os: &mut CxOs, devices: &[AudioDeviceId]) {
@@ -130,19 +160,43 @@ pub unsafe extern "C" fn wasm_audio_output_entrypoint(context_ptr: u32, frames: 
         let mut wa = (*wa).lock().unwrap();
         (wa.audio_output_cb[0].clone(), wa.output_buffer.take().unwrap(), wa.output_device_id)
     };
-    
+
     output_buffer.clear_final_size();
     output_buffer.resize(frames as usize, channels as usize);
     output_buffer.set_final_size();
     let mut output_fn = output_fn.lock().unwrap();
-    
+
     if let Some(output_fn) = &mut *output_fn {
         output_fn(AudioInfo {device_id, time: None}, &mut output_buffer);
     }
     let ptr = output_buffer.data.as_ptr();
-    
+
     (*wa).lock().unwrap().output_buffer = Some(output_buffer);
-    
+
     ptr as u32
+}
+
+#[export_name = "wasm_audio_input_entrypoint"]
+#[cfg(target_arch = "wasm32")]
+pub unsafe extern "C" fn wasm_audio_input_entrypoint(context_ptr: u32, frames: u32, channels: u32, data_ptr: u32) {
+    let wa = context_ptr as *const Mutex<WebAudioAccess>;
+    let (input_fn, mut input_buffer, device_id) = {
+        let mut wa = (*wa).lock().unwrap();
+        (wa.audio_input_cb[0].clone(), wa.input_buffer.take().unwrap(), wa.input_device_id)
+    };
+
+    // Copy input data from the passed pointer
+    let input_data = std::slice::from_raw_parts(data_ptr as *const f32, (frames * channels) as usize);
+    input_buffer.clear_final_size();
+    input_buffer.resize(frames as usize, channels as usize);
+    input_buffer.copy_from_interleaved(channels as usize, input_data);
+    input_buffer.set_final_size();
+
+    let mut input_fn = input_fn.lock().unwrap();
+    if let Some(input_fn) = &mut *input_fn {
+        input_fn(AudioInfo {device_id, time: None}, &input_buffer);
+    }
+
+    (*wa).lock().unwrap().input_buffer = Some(input_buffer);
 }
 

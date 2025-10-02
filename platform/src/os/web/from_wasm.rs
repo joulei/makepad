@@ -337,6 +337,16 @@ pub struct FromWasmStartAudioOutput {
 pub struct FromWasmStopAudioOutput {
 }
 
+#[derive(FromWasm)]
+pub struct FromWasmStartAudioInput {
+    pub web_device_id: String,
+    pub context_ptr: u32,
+}
+
+#[derive(FromWasm)]
+pub struct FromWasmStopAudioInput {
+}
+
 
 
 
