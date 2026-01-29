@@ -404,7 +404,8 @@ impl MacosApp {
                                     MacosEvent::TextInput(TextInputEvent {
                                         input: string,
                                         was_paste: true,
-                                        replace_last: false
+                                        replace_last: false,
+                                        ..Default::default()
                                     })
                                 );
                             }

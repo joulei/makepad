@@ -10,12 +10,17 @@ use {
             apple::{
                 apple_sys::*,
                 apple_util::*,
-                apple_gamepad::AppleGamepad,
+                apple_game_input::AppleGameInput,
             },
             cx_native::EventFlow,
             ios::{
                 ios_delegates::*,
                 ios_event::*,
+                ios_text_input::{
+                    define_makepad_text_position,
+                    define_makepad_text_range,
+                    define_text_input_view,
+                },
             }
         },
         area::Area,
@@ -35,6 +40,17 @@ thread_local! {
 pub fn with_ios_app<R>(f: impl FnOnce(&mut IosApp) -> R) -> R {
     IOS_APP.with_borrow_mut(|app| {
         f(app.as_mut().unwrap())
+    })
+}
+
+pub fn try_with_ios_app<R>(f: impl FnOnce(&mut IosApp) -> R) -> Option<R> {
+    IOS_APP.with(|app| {
+        if let Ok(mut app_ref) = app.try_borrow_mut() {
+            if let Some(ref mut app) = *app_ref {
+                return Some(f(app));
+            }
+        }
+        None
     })
 }
 
@@ -68,6 +84,9 @@ pub struct IosClasses {
     pub gesture_recognizer_handler: *const Class,
     pub textfield_delegate: *const Class,
     pub timer_delegate: *const Class,
+    pub text_position: *const Class,
+    pub text_range: *const Class,
+    pub text_input_view: *const Class,
 }
 impl IosClasses {
     pub fn new() -> Self {
@@ -77,7 +96,10 @@ impl IosClasses {
             mtk_view_delegate: define_mtk_view_delegate(),
             gesture_recognizer_handler: define_gesture_recognizer_handler(),
             textfield_delegate: define_textfield_delegate(),
-            timer_delegate: define_ios_timer_delegate()
+            timer_delegate: define_ios_timer_delegate(),
+            text_position: define_makepad_text_position(),
+            text_range: define_makepad_text_range(),
+            text_input_view: define_text_input_view(),
         }
     }
 }
@@ -96,7 +118,7 @@ pub struct IosApp {
     event_callback: Option<Box<dyn FnMut(IosEvent) -> EventFlow >>,
     event_flow: EventFlow,
     pasteboard: ObjcId,
-    pub apple_gamepad: Rc<RefCell<AppleGamepad>>,
+    pub apple_game_input: Rc<RefCell<AppleGameInput>>,
 }
 
 impl IosApp {
@@ -112,10 +134,10 @@ impl IosApp {
             //let () = msg_send![ns_app, setDelegate: app_delegate_instance];
             
             let pasteboard: ObjcId = msg_send![class!(UIPasteboard), generalPasteboard];
-            let apple_gamepad = AppleGamepad::init(|event| {
-                IosApp::do_callback(IosEvent::GamepadConnected(event));
-            });
-            
+            let apple_game_input = Rc::new(RefCell::new(AppleGameInput::init(|event| {
+                IosApp::do_callback(IosEvent::GameInputConnected(event));
+            })));
+
             IosApp {
                 virtual_keyboard_event: None,
                 touches: Vec::new(),
@@ -130,7 +152,7 @@ impl IosApp {
                 event_flow: EventFlow::Poll,
                 event_callback: Some(event_callback),
                 pasteboard,
-                apple_gamepad,
+                apple_game_input,
             }
         }
     }
@@ -420,9 +442,12 @@ impl IosApp {
     
     pub fn send_text_input(input: String, replace_last: bool) {
         IosApp::do_callback(IosEvent::TextInput(TextInputEvent {
-            input: input,
+            input,
             was_paste: false,
-            replace_last: replace_last
+            replace_last,
+            composition: None,
+            full_state_sync: None,
+            replace_range: None,
         }))
     }
     
@@ -441,7 +466,35 @@ impl IosApp {
             time,
         }));
     }
-    
+
+    pub fn send_return_key() {
+        let time = with_ios_app(|app| app.time_now());
+        IosApp::do_callback(IosEvent::KeyDown(KeyEvent {
+            key_code: KeyCode::ReturnKey,
+            is_repeat: false,
+            modifiers: Default::default(),
+            time,
+        }));
+        IosApp::do_callback(IosEvent::KeyUp(KeyEvent {
+            key_code: KeyCode::ReturnKey,
+            is_repeat: false,
+            modifiers: Default::default(),
+            time,
+        }));
+    }
+
+    pub fn send_text_range_replace(start: usize, end: usize, text: String) {
+        use crate::event::keyboard::CharOffset;
+        IosApp::do_callback(IosEvent::TextInput(TextInputEvent {
+            input: text,
+            was_paste: false,
+            replace_last: false,
+            composition: None,
+            full_state_sync: None,
+            replace_range: Some((CharOffset(start), CharOffset(end))),
+        }))
+    }
+
     pub fn send_timer_received(nstimer: ObjcId) {
         let len = with_ios_app(|app| app.timers.len());
         let time = with_ios_app(|app| app.time_now());

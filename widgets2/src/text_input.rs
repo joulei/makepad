@@ -23,6 +23,12 @@ use {
     unicode_segmentation::{GraphemeCursor, UnicodeSegmentation},
 };
 
+// Import IME configuration types
+use crate::makepad_platform::{
+    InputMode, AutoCapitalize, AutoCorrect, ReturnKeyType,
+    TextInputConfig, SoftKeyboardConfig, CharOffset,
+};
+
 
 live_design! {
     link widgets;
@@ -599,7 +605,21 @@ pub struct TextInput {
 
     #[live] is_password: bool,
     #[live] is_read_only: bool,
-    #[live] is_numeric_only: bool,
+    /// Input mode controls both the mobile soft keyboard layout and widget-level
+    /// input filtering. Ascii, Numeric, Decimal, and Tel modes filter input on
+    /// all platforms. Url, Email, and Search only affect the keyboard layout on mobile.
+    #[live] input_mode: InputMode,
+    /// Autocapitalization hint for mobile soft keyboards. This only affects the
+    /// keyboard's default shift state on iOS/Android - it does not transform input
+    /// text and has no effect on desktop platforms.
+    #[live] autocapitalize: AutoCapitalize,
+    /// Autocorrection hint for mobile soft keyboards. Only affects iOS/Android;
+    /// has no effect on desktop platforms.
+    #[live] autocorrect: AutoCorrect,
+    /// Return key appearance on mobile soft keyboards.
+    #[live] return_key_type: ReturnKeyType,
+    /// Whether the text input is multiline.
+    #[live(true)] is_multiline: bool,
     #[live] scroll_y: f64,
     #[live] empty_text: String,
     #[rust] text: String,
@@ -614,10 +634,12 @@ pub struct TextInput {
     #[rust] preserved_selection_cursor: Option<Cursor>,
     /// Skip finger move after long press to prevent selection changes
     #[rust] ignore_next_move: bool,
-    /// IME composition tracking - byte index where composition starts
+    /// Byte index in self.text where the active IME composition starts.
+    /// Only valid when has_composition() returns true.
     #[rust] composition_start: usize,
-    /// IME composition tracking - byte length of current composition
-    #[rust] composition_length: usize,
+    /// Byte index in self.text where the active IME composition ends.
+    /// When composition_end == composition_start, there is no active composition.
+    #[rust] composition_end: usize,
 }
 
  impl LiveHook for TextInput{
@@ -666,18 +688,56 @@ impl TextInput {
         self.set_is_read_only(cx, !self.is_read_only);
     }
 
+    /// Returns true if input_mode is Numeric, Decimal, or Tel
     pub fn is_numeric_only(&self) -> bool {
-        self.is_numeric_only
+        matches!(self.input_mode, InputMode::Numeric | InputMode::Decimal | InputMode::Tel)
     }
 
+    /// Set numeric-only mode (sets input_mode to Numeric or Text)
     pub fn set_is_numeric_only(&mut self, cx: &mut Cx, is_numeric_only: bool) {
-        self.is_numeric_only = is_numeric_only;
+        self.input_mode = if is_numeric_only { InputMode::Numeric } else { InputMode::Text };
         self.laidout_text = None;
         self.draw_bg.redraw(cx);
     }
 
     pub fn toggle_is_numeric_only(&mut self, cx: &mut Cx) {
-        self.set_is_numeric_only(cx, !self.is_numeric_only);
+        self.set_is_numeric_only(cx, !self.is_numeric_only());
+    }
+
+    /// Filter input based on input_mode settings.
+    /// is_set_text is true when called from set_text() (allows clearing text).
+    fn filter_input(&self, input: &str, is_set_text: bool) -> String {
+        match self.input_mode {
+            InputMode::Ascii => {
+                // Allow only ASCII printable characters
+                input.chars().filter(|c| c.is_ascii() && !c.is_ascii_control()).collect()
+            }
+            InputMode::Numeric => {
+                // Allow only digits 0-9
+                input.chars().filter(|c| c.is_ascii_digit()).collect()
+            }
+            InputMode::Decimal => {
+                // Allow digits and one decimal point
+                let mut result = String::new();
+                let has_dot = self.text.contains('.');
+                for c in input.chars() {
+                    if c.is_ascii_digit() {
+                        result.push(c);
+                    } else if c == '.' && !has_dot && !result.contains('.') {
+                        result.push(c);
+                    }
+                }
+                result
+            }
+            InputMode::Tel => {
+                // Allow digits, +, -, *, #, and space (common phone number chars)
+                input.chars().filter(|c| c.is_ascii_digit() || matches!(c, '+' | '-' | '*' | '#' | ' ' | '(' | ')')).collect()
+            }
+            // These modes don't filter on desktop - they just affect mobile keyboard layout
+            InputMode::Text | InputMode::Url | InputMode::Email | InputMode::Search => {
+                input.to_string()
+            }
+        }
     }
 
     pub fn empty_text(&self) -> &str {
@@ -1701,18 +1761,18 @@ impl Widget for TextInput {
                 let input = self.filter_input(&input, false);
                 if input.is_empty() {
                     // Empty input with replace_last means composition was cancelled
-                    if replace_last && self.composition_length > 0 {
+                    if replace_last && self.composition_end - self.composition_start > 0 {
                         // Remove the composition text
                         self.create_or_extend_edit_group(EditKind::Other);
                         self.apply_edit(
                             cx,
                             Edit {
                                 start: self.composition_start,
-                                end: self.composition_start + self.composition_length,
+                                end: self.composition_end,
                                 replace_with: String::new()
                             }
                         );
-                        self.composition_length = 0;
+                        self.composition_end = self.composition_start;
                         self.draw_bg.redraw(cx);
                         cx.widget_action(uid, &scope.path, TextInputAction::Changed(self.text.clone()));
                     }
@@ -1721,22 +1781,22 @@ impl Widget for TextInput {
 
                 if replace_last {
                     // IME composition update
-                    if self.composition_length > 0 {
+                    if self.composition_end - self.composition_start > 0 {
                         // Replace previous composition text
                         self.create_or_extend_edit_group(EditKind::Other);
                         self.apply_edit(
                             cx,
                             Edit {
                                 start: self.composition_start,
-                                end: self.composition_start + self.composition_length,
+                                end: self.composition_end,
                                 replace_with: input.clone()
                             }
                         );
-                        self.composition_length = input.len();
+                        self.composition_end = self.composition_start + input.len();
                     } else {
                         // First composition character - record start position
                         self.composition_start = self.selection.start().index;
-                        self.composition_length = input.len();
+                        self.composition_end = self.composition_start + input.len();
                         self.create_or_extend_edit_group(EditKind::Other);
                         self.apply_edit(
                             cx,
@@ -1749,18 +1809,18 @@ impl Widget for TextInput {
                     }
                 } else {
                     // Final commit or regular text input
-                    if self.composition_length > 0 {
+                    if self.composition_end - self.composition_start > 0 {
                         // Replace composition with final committed text
                         self.create_or_extend_edit_group(EditKind::Other);
                         self.apply_edit(
                             cx,
                             Edit {
                                 start: self.composition_start,
-                                end: self.composition_start + self.composition_length,
+                                end: self.composition_end,
                                 replace_with: input
                             }
                         );
-                        self.composition_length = 0;
+                        self.composition_end = self.composition_start;
                     } else {
                         // Normal text input (no active composition)
                         self.create_or_extend_edit_group(
@@ -1797,7 +1857,7 @@ impl Widget for TextInput {
                     .unwrap_or(self.text.len());
 
                 // Clear any active composition
-                self.composition_length = 0;
+                self.composition_end = self.composition_start;
 
                 // Perform the replacement
                 self.create_or_extend_edit_group(EditKind::Other);

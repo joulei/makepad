@@ -382,7 +382,7 @@ impl X11Cx {
                     CxOsOp::StopTimer(timer_id) => {
                         xlib_app.stop_timer(timer_id);
                     },
-                    CxOsOp::ShowTextIME(area, pos) => {
+                    CxOsOp::ShowTextIME(area, pos, _config) => {
                         let pos = area.clipped_rect(&cx).pos + pos;
                         opengl_windows.iter_mut().for_each(|w| {
                             w.xlib_window.set_ime_spot(pos);
@@ -392,6 +392,9 @@ impl X11Cx {
                         opengl_windows.iter_mut().for_each(|w| {
                             w.xlib_window.set_ime_spot(dvec2(0.0,0.0));
                         });
+                    },
+                    CxOsOp::SyncImeState {..} => {
+                        // Not implemented for X11
                     },
                     CxOsOp::CheckPermission {permission, request_id} => {
                         // Linux desktop apps have all permissions granted by default (handled at system level)

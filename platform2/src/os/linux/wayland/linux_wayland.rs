@@ -335,7 +335,7 @@ impl WaylandCx {
                 CxOsOp::StopTimer(timer_id) => {
                     state.stop_timer(timer_id);
                 },
-                CxOsOp::ShowTextIME(area, pos) => {
+                CxOsOp::ShowTextIME(area, pos, _config) => {
                     if let Some(window) = state.current_window {
                         if let Some(text_input) = state.text_input.as_ref() {
                             text_input.enable();
@@ -351,6 +351,9 @@ impl WaylandCx {
                         text_input.disable();
                         text_input.commit();
                     }
+                },
+                CxOsOp::SyncImeState {..} => {
+                    // Not implemented for Wayland
                 },
                 e=>{
                     crate::error!("Not implemented on this platform: CxOsOp::{:?}", e);

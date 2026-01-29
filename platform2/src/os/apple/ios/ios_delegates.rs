@@ -1,13 +1,12 @@
 use {
     crate::{
         makepad_math::*,
-        event::{TouchState, VirtualKeyboardEvent},
-        animator::Ease,
+        event::{TouchState, VirtualKeyboardEvent, Ease},
         os::{
-            apple::ios_app::IosApp,
+            apple::ios::ios_app::IosApp,
             apple::apple_util::nsstring_to_string,
             apple::apple_sys::*,
-            apple::ios_app::with_ios_app,
+            apple::ios::ios_app::with_ios_app,
         },
     }
 };

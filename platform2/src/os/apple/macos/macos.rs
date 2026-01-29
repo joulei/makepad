@@ -547,7 +547,7 @@ impl Cx {
                         metal_window.cocoa_window.hide();
                     }
                 }
-                CxOsOp::ShowTextIME(area, pos) => {
+                CxOsOp::ShowTextIME(area, pos, _config) => {
                     let pos = area.clipped_rect(self).pos + pos;
                     metal_windows.iter_mut().for_each( | w | {
                         w.cocoa_window.set_ime_spot(pos);
@@ -557,6 +557,9 @@ impl Cx {
                     metal_windows.iter_mut().for_each( | w | {
                         w.cocoa_window.set_ime_spot(dvec2(0.0,0.0));
                     });
+                },
+                CxOsOp::SyncImeState {..} => {
+                    // Not implemented for macOS desktop
                 },
                 CxOsOp::SetCursor(cursor) => {
                     with_macos_app(|app| app.set_mouse_cursor(cursor));

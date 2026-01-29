@@ -160,12 +160,6 @@ impl Cx {
                         self.handle_action_receiver();
                     }
 
-                    if self.handle_live_edit(){
-                        // self.draw_shaders.ptr_to_item.clear();
-                        // self.draw_shaders.fingerprints.clear();
-                        self.call_event_handler(&Event::LiveEdit);
-                        self.redraw_all();
-                    }
                     self.handle_networking_events();
                     self.handle_permission_events();
                 }
@@ -180,8 +174,6 @@ impl Cx {
             }
             IosEvent::Init=>{
                 with_ios_app(|app| app.start_timer(0, 0.008, true));
-                // Start gamepad monitoring
-                crate::os::apple::apple_gamepad::start_gamepad_monitoring();
                 self.start_studio_websocket_delayed();
                 self.call_event_handler(&Event::Startup);
                 self.redraw_all();
@@ -270,8 +262,8 @@ impl Cx {
             IosEvent::PermissionResult(result) => {
                 self.call_event_handler(&Event::PermissionResult(result))
             }
-            IosEvent::GamepadConnected(e) => {
-                self.call_event_handler(&Event::GamepadConnected(e))
+            IosEvent::GameInputConnected(e) => {
+                self.call_event_handler(&Event::GameInputConnected(e))
             }
         }
 
@@ -290,8 +282,11 @@ impl Cx {
                     window.window_geom = with_ios_app(|app| app.last_window_geom.clone());
                     window.is_created = true;
                 },
-                CxOsOp::ShowTextIME(_area, _pos) => {
+                CxOsOp::ShowTextIME(_area, _pos, _config) => {
                     IosApp::show_keyboard();
+                },
+                CxOsOp::SyncImeState { .. } => {
+                    // iOS handles IME state internally through UITextInput protocol
                 },
                 CxOsOp::HideTextIME => {
                     IosApp::hide_keyboard();
@@ -433,17 +428,13 @@ impl CxOsApi for Cx {
     fn init_cx_os(&mut self) {
         self.os.start_time = Some(Instant::now());
         #[cfg(not(apple_sim))]{
-            self.live_registry.borrow_mut().package_root = Some("makepad".to_string());
+            self.package_root = Some("makepad".to_string());
         }
-
-        self.live_expand();
 
         if !Self::has_studio_web_socket() {
             #[cfg(apple_sim)]
             self.start_disk_live_file_watcher(50);
         }
-
-        self.live_scan_dependencies();
 
         #[cfg(apple_sim)]
         self.native_load_dependencies();
@@ -476,7 +467,6 @@ impl CxOsApi for Cx {
 }
 
 
-#[derive(Default)]
 pub struct CxOs {
     pub (crate) start_time: Option<Instant>,
     pub (crate) media: CxAppleMedia,
@@ -485,6 +475,22 @@ pub struct CxOs {
     pub (crate) network_response: NetworkResponseChannel,
     pub (crate) http_requests: AppleHttpRequests,
     pub (crate) permission_response: PermissionResultChannel,
+    pub (crate) apple_game_input: Option<crate::os::apple::apple_game_input::AppleGameInput>,
+}
+
+impl Default for CxOs {
+    fn default() -> Self {
+        Self {
+            start_time: None,
+            media: Default::default(),
+            bytes_written: 0,
+            draw_calls_done: 0,
+            network_response: Default::default(),
+            http_requests: Default::default(),
+            permission_response: Default::default(),
+            apple_game_input: None,
+        }
+    }
 }
 
 pub struct PermissionResultChannel {

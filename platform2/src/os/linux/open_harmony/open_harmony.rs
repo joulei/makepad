@@ -529,7 +529,7 @@ impl Cx {
                 CxOsOp::StopTimer(timer_id) => {
                     self.os.timers.timers.remove(&timer_id);
                 }
-                CxOsOp::ShowTextIME(_area, _pos) => {
+                CxOsOp::ShowTextIME(_area, _pos, _config) => {
                     let _ = self.os.arkts_obj.as_mut().unwrap().call_js_function(
                         "showKeyBoard",
                         0,
@@ -544,6 +544,9 @@ impl Cx {
                     );
                     //self.os.keyboard_visible = false;
                     //unsafe {android_jni::to_java_show_keyboard(false);}
+                }
+                CxOsOp::SyncImeState {..} => {
+                    // Not implemented for OpenHarmony
                 }
                 e=>{
                     crate::error!("Not implemented on this platform: CxOsOp::{:?}", e);

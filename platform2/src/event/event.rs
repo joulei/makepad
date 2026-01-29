@@ -196,6 +196,7 @@ pub enum Event {
     TextInput(TextInputEvent),
     TextCopy(TextClipboardEvent),
     TextCut(TextClipboardEvent),
+    ImeAction(ImeActionEvent),
 
     Drag(DragEvent),
     Drop(DropEvent),
@@ -284,6 +285,7 @@ impl Event{
             34=>"TextInput",
             35=>"TextCopy",
             36=>"TextCut",
+            57=>"ImeAction",
 
             37=>"Drag",
             38=>"Drop",
@@ -359,6 +361,7 @@ impl Event{
             Self::TextInput(_)=>34,
             Self::TextCopy(_)=>35,
             Self::TextCut(_)=>36,
+            Self::ImeAction(_)=>57,
 
             Self::Drag(_)=>37,
             Self::Drop(_)=>38,

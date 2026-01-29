@@ -1,6 +1,7 @@
 use {
     std::rc::Rc,
     std::cell::RefCell,
+    std::ops::Range,
     crate::{
         makepad_micro_serde::*,
         makepad_script::*,
@@ -123,16 +124,149 @@ pub struct KeyFocusEvent {
     pub focus: Area,
 }
 
-#[derive(Clone, Debug, SerBin, DeBin, SerJson, DeJson, PartialEq)]
+/// Character offset (Unicode scalar values)
+/// Platform-independent index type for text positions
+/// One character = one Unicode scalar (one emoji = one character)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, SerBin, DeBin, SerJson, DeJson)]
+pub struct CharOffset(pub usize);
+
+impl CharOffset {
+    /// Convert to byte index in UTF-8 string
+    pub fn to_byte_index(self, text: &str) -> usize {
+        text.char_indices()
+            .nth(self.0)
+            .map(|(byte_idx, _)| byte_idx)
+            .unwrap_or(text.len())
+    }
+
+    /// Convert from UTF-16 index (Android/Java)
+    /// UTF-16 uses 1 unit for BMP chars, 2 units for emoji/supplementary
+    pub fn from_utf16_index(text: &str, utf16_idx: usize) -> Self {
+        let mut utf16_count = 0;
+        for (char_idx, c) in text.chars().enumerate() {
+            if utf16_count >= utf16_idx {
+                return CharOffset(char_idx);
+            }
+            utf16_count += c.len_utf16();
+        }
+        CharOffset(text.chars().count())
+    }
+
+    /// Convert to UTF-16 index (for Android/Java)
+    pub fn to_utf16_index(self, text: &str) -> usize {
+        text.chars()
+            .take(self.0)
+            .map(|c| c.len_utf16())
+            .sum()
+    }
+
+    /// Convert Range<CharOffset> to Range<usize> (byte indices)
+    pub fn range_to_bytes(range: &Range<CharOffset>, text: &str) -> Range<usize> {
+        range.start.to_byte_index(text)..range.end.to_byte_index(text)
+    }
+}
+
+/// Full text state from platform IME (Android InputConnection)
+/// Used when platform is authoritative source of text state
+/// Not serializable - only used for in-process events
+#[derive(Clone, Debug, PartialEq)]
+pub struct FullTextState {
+    /// Full text content
+    pub text: String,
+    /// Selection range in character offsets
+    pub selection: Range<CharOffset>,
+    /// Composition range in character offsets (within text)
+    /// None = no active composition
+    pub composition: Option<Range<CharOffset>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct TextInputEvent {
+    /// Text to insert or replace
     pub input: String,
+    /// If true, replaces the previous composition/input
+    /// Used for IME composition updates
     pub replace_last: bool,
-    pub was_paste: bool
+    /// True if this input came from paste operation
+    pub was_paste: bool,
+    /// Composition range in character offsets (within input string)
+    /// Some(range) = text is being composed (show underline)
+    /// None = text is committed (no composition active)
+    /// Not serializable - only used for in-process events
+    pub composition: Option<Range<usize>>,
+    /// Full text state synchronization (Android only)
+    /// When Some, this is authoritative full state from platform
+    /// Widget should replace entire text buffer and selection
+    /// Not serializable - only used for in-process events
+    pub full_state_sync: Option<FullTextState>,
+    /// Range to replace in existing text (iOS autocorrect/paste)
+    /// When Some, replace text[start..end] with input
+    /// Character offsets in the widget's current text
+    /// Not serializable - only used for in-process events
+    pub replace_range: Option<(CharOffset, CharOffset)>,
+}
+
+impl Default for TextInputEvent {
+    fn default() -> Self {
+        Self {
+            input: String::new(),
+            replace_last: false,
+            was_paste: false,
+            composition: None,
+            full_state_sync: None,
+            replace_range: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct TextClipboardEvent {
     pub response: Rc<RefCell<Option<String>>>
+}
+
+/// IME editor action type (from mobile soft keyboard action buttons)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImeAction {
+    /// Default action (not specified)
+    Unspecified,
+    None,
+    /// "Go" button - typically for URL bars
+    Go,
+    /// "Search" button - typically for search fields
+    Search,
+    /// "Send" button - typically for messaging
+    Send,
+    /// "Next" button - move to next field
+    Next,
+    /// "Done" button - finish input
+    Done,
+    /// "Previous" button - move to previous field
+    Previous,
+}
+
+impl ImeAction {
+    /// Convert from Android EditorInfo action codes
+    pub fn from_android_action_code(code: i32) -> Self {
+        match code {
+            0 => ImeAction::Unspecified,
+            1 => ImeAction::None,
+            2 => ImeAction::Go,
+            3 => ImeAction::Search,
+            4 => ImeAction::Send,
+            5 => ImeAction::Next,
+            6 => ImeAction::Done,
+            7 => ImeAction::Previous,
+            _ => ImeAction::Unspecified,
+        }
+    }
+}
+
+/// Event for IME editor action (Done, Go, Search, etc.)
+/// Triggered when user presses the action button on the soft keyboard
+#[derive(Clone, Debug)]
+pub struct ImeActionEvent {
+    /// The action that was triggered
+    pub action: ImeAction,
 }
 
 impl Default for KeyCode {

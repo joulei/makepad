@@ -424,7 +424,8 @@ impl MacosWindow {
         self.do_callback(MacosEvent::TextInput(TextInputEvent {
             input: input,
             was_paste: false,
-            replace_last: replace_last
+            replace_last: replace_last,
+            ..Default::default()
         }))
     }
     

@@ -8,6 +8,7 @@ pub mod log;
 #[macro_use]
 mod cx;
 mod cx_api;
+pub mod ime;
 
 pub mod action;
 pub mod game_input;
@@ -178,6 +179,10 @@ pub use {
             KeyFocusEvent,
             TextInputEvent,
             TextClipboardEvent,
+            CharOffset,
+            FullTextState,
+            ImeAction,
+            ImeActionEvent,
             WindowCloseRequestedEvent,
             WindowClosedEvent,
             WindowDragQueryResponse,
@@ -212,6 +217,14 @@ pub use {
             ComponentInfo,
             ComponentRegistry,
             ComponentRegistries,
+        },
+        ime::{
+            InputMode,
+            AutoCapitalize,
+            AutoCorrect,
+            ReturnKeyType,
+            SoftKeyboardConfig,
+            TextInputConfig,
         },
         cursor::MouseCursor,
         macos_menu::MacosMenu,

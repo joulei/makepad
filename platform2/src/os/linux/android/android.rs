@@ -48,6 +48,7 @@ use {
             //TimerEvent,
             TextInputEvent,
             TextClipboardEvent,
+            CharOffset,
             KeyEvent,
             KeyModifiers,
             KeyCode,
@@ -549,7 +550,51 @@ impl Cx {
                     input: content,
                     replace_last: false,
                     was_paste: true,
+                    ..Default::default()
                 });
+                self.call_event_handler(&e);
+            }
+            FromJavaMessage::ImeTextStateChanged {
+                full_text,
+                selection_start,
+                selection_end,
+                composing_start,
+                composing_end
+            } => {
+                // Convert UTF-16 indices to CharOffset
+                let selection = std::ops::Range {
+                    start: CharOffset::from_utf16_index(&full_text, selection_start.max(0) as usize),
+                    end: CharOffset::from_utf16_index(&full_text, selection_end.max(0) as usize),
+                };
+                let composition = if composing_start >= 0 && composing_end >= 0 {
+                    Some(std::ops::Range {
+                        start: CharOffset::from_utf16_index(&full_text, composing_start as usize),
+                        end: CharOffset::from_utf16_index(&full_text, composing_end as usize),
+                    })
+                } else {
+                    None
+                };
+
+                let full_state = crate::event::keyboard::FullTextState {
+                    text: full_text.clone(),
+                    selection,
+                    composition,
+                };
+
+                let e = Event::TextInput(TextInputEvent {
+                    input: full_text,
+                    replace_last: false,
+                    was_paste: false,
+                    composition: None,
+                    full_state_sync: Some(full_state),
+                    replace_range: None,
+                });
+                self.call_event_handler(&e);
+            }
+            FromJavaMessage::ImeEditorAction { action_code } => {
+                use crate::event::keyboard::{ImeAction, ImeActionEvent};
+                let action = ImeAction::from_android_action_code(action_code);
+                let e = Event::ImeAction(ImeActionEvent { action });
                 self.call_event_handler(&e);
             }
             FromJavaMessage::Init(_) => {
@@ -967,13 +1012,24 @@ impl Cx {
                 CxOsOp::StopTimer(timer_id) => {
                     self.os.timers.timers.remove(&timer_id);
                 },
-                CxOsOp::ShowTextIME(_area, _pos) => {
+                CxOsOp::ShowTextIME(_area, _pos, config) => {
                     //self.os.keyboard_trigger_position = area.get_clipped_rect(self).pos;
-                    unsafe {android_jni::to_java_show_keyboard(true);}
+                    unsafe {
+                        android_jni::to_java_configure_keyboard(&config);
+                        android_jni::to_java_show_keyboard(true);
+                    }
                 },
                 CxOsOp::HideTextIME => {
                     //self.os.keyboard_visible = false;
                     unsafe {android_jni::to_java_show_keyboard(false);}
+                },
+                CxOsOp::SyncImeState { text, selection, composition: _ } => {
+                    // Update Java-side IME state when Rust changes text programmatically
+                    let selection_start = selection.start.to_utf16_index(&text) as i32;
+                    let selection_end = selection.end.to_utf16_index(&text) as i32;
+                    unsafe {
+                        android_jni::to_java_update_ime_text_state(&text, selection_start, selection_end);
+                    }
                 },
                 CxOsOp::CopyToClipboard(content) => {
                     unsafe {android_jni::to_java_copy_to_clipboard(content);}

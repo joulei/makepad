@@ -1,4 +1,5 @@
 use crate::file_dialogs::FileDialog;
+use crate::ime::TextInputConfig;
 
 use {
     crate::{
@@ -6,7 +7,7 @@ use {
         cursor::MouseCursor,
         cx::{Cx, CxRef, OsType, XrCapabilities},
         draw_list::DrawListId,
-        event::{DragItem, HttpRequest, NextFrame, Timer, Trigger, VideoSource},
+        event::{DragItem, HttpRequest, NextFrame, Timer, Trigger, VideoSource, keyboard::CharOffset},
         gpu_info::GpuInfo,
         macos_menu::MacosMenu,
         makepad_futures::executor::Spawner,
@@ -21,6 +22,7 @@ use {
     },
     std::{
         any::{Any, TypeId},
+        ops::Range,
         rc::Rc,
     },
 };
@@ -73,8 +75,16 @@ pub enum CxOsOp {
     SetTopmost(WindowId, bool),
     ShowInDock(bool),
 
-    ShowTextIME(Area, Vec2d),
+    ShowTextIME(Area, Vec2d, TextInputConfig),
     HideTextIME,
+    /// Synchronize IME with current text state
+    /// Used when widget changes text programmatically (clear, paste, undo)
+    /// Platform converts to native format (Android: updateSelection, iOS: update positions)
+    SyncImeState {
+        text: String,
+        selection: Range<CharOffset>,
+        composition: Option<Range<CharOffset>>,
+    },
     SetCursor(MouseCursor),
     StartTimer {
         timer_id: u64,
@@ -159,6 +169,7 @@ impl std::fmt::Debug for CxOsOp {
 
             Self::ShowTextIME(..)=>write!(f, "ShowTextIME"),
             Self::HideTextIME=>write!(f, "HideTextIME"),
+            Self::SyncImeState{..}=>write!(f, "SyncImeState"),
             Self::SetCursor(..)=>write!(f, "SetCursor"),
             Self::StartTimer{..}=>write!(f, "StartTimer"),
             Self::StopTimer(..)=>write!(f, "StopTimer"),
@@ -314,20 +325,47 @@ impl Cx {
     }
 
     pub fn show_text_ime(&mut self, area: Area, pos: Vec2d) {
+        self.show_text_ime_with_config(area, pos, TextInputConfig::default());
+    }
+
+    pub fn show_text_ime_with_config(&mut self, area: Area, pos: Vec2d, config: TextInputConfig) {
         if !self.keyboard.text_ime_dismissed {
             self.ime_area = area;
-            self.platform_ops.push(CxOsOp::ShowTextIME(area, pos));
+            self.platform_ops.push(CxOsOp::ShowTextIME(area, pos, config));
         }
     }
 
     pub fn hide_text_ime(&mut self) {
-        self.keyboard.reset_text_ime_dismissed();
+        self.keyboard.set_text_ime_dismissed();
         self.platform_ops.push(CxOsOp::HideTextIME);
+    }
+
+    /// Synchronize IME with current text state
+    /// Call this when widget changes text programmatically (clear, paste, undo)
+    /// Platform will update native IME state accordingly
+    pub fn sync_ime_state(&mut self, text: String, selection: Range<CharOffset>, composition: Option<Range<CharOffset>>) {
+        self.platform_ops.push(CxOsOp::SyncImeState {
+            text,
+            selection,
+            composition,
+        });
     }
 
     pub fn text_ime_was_dismissed(&mut self) {
         self.keyboard.set_text_ime_dismissed();
         self.platform_ops.push(CxOsOp::HideTextIME);
+    }
+
+    /// Returns true if the text IME was just dismissed (keyboard closed).
+    /// Used to prevent unwanted focus changes when keyboard closes.
+    pub fn keyboard_text_ime_dismissed(&self) -> bool {
+        self.keyboard.text_ime_dismissed
+    }
+
+    /// Clears the text IME dismissed flag.
+    /// Should be called after handling the dismissed state.
+    pub fn clear_keyboard_text_ime_dismissed(&mut self) {
+        self.keyboard.reset_text_ime_dismissed();
     }
 
     /// Shows the native clipboard actions menu (Copy/Paste/Cut/Select All).

@@ -386,15 +386,6 @@ pub struct StdinMouseUp {
    pub modifiers: StdinKeyModifiers
 }
 
-#[derive(Clone, Copy, Debug, Default, SerBin, DeBin, SerJson, DeJson, PartialEq)]
-pub struct StdinTextInput{
-    pub time: f64,
-    pub window_id: usize,
-    pub raw_button: usize,
-    pub x: f64,
-    pub y: f64
-}
-
 impl StdinMouseUp {
    pub fn into_event(self, window_id: WindowId, pos: Vec2d) -> MouseUpEvent {
         MouseUpEvent {
@@ -434,6 +425,26 @@ impl StdinScroll {
     }
 }
 
+/// Serializable text input event for stdin protocol.
+/// Non-serializable fields from TextInputEvent are omitted.
+#[derive(Clone, Debug, SerBin, DeBin, SerJson, DeJson)]
+pub struct StdinTextInput {
+    pub input: String,
+    pub replace_last: bool,
+    pub was_paste: bool,
+}
+
+impl From<StdinTextInput> for TextInputEvent {
+    fn from(stdin: StdinTextInput) -> Self {
+        TextInputEvent {
+            input: stdin.input,
+            replace_last: stdin.replace_last,
+            was_paste: stdin.was_paste,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, SerBin, DeBin, SerJson, DeJson)]
 pub enum HostToStdin{
     Swapchain(SharedSwapchain),
@@ -461,7 +472,7 @@ pub enum HostToStdin{
     MouseMove(StdinMouseMove),
     KeyDown(KeyEvent),
     KeyUp(KeyEvent),
-    TextInput(TextInputEvent),
+    TextInput(StdinTextInput),
     Scroll(StdinScroll),
     /*ReloadFile{
         file:String,
